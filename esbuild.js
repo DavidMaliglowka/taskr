@@ -33,9 +33,30 @@ const aliasPlugin = {
 	setup(build) {
 		// Handle @/ aliases for shadcn/ui
 		build.onResolve({ filter: /^@\// }, args => {
-			return {
-				path: path.resolve(__dirname, 'src', args.path.slice(2))
-			};
+			const resolvedPath = path.resolve(__dirname, 'src', args.path.slice(2));
+			
+			// Try to resolve with common TypeScript extensions
+			const fs = require('fs');
+			const extensions = ['.tsx', '.ts', '.jsx', '.js'];
+			
+			// Check if it's a file first
+			for (const ext of extensions) {
+				const fullPath = resolvedPath + ext;
+				if (fs.existsSync(fullPath)) {
+					return { path: fullPath };
+				}
+			}
+			
+			// Check if it's a directory with index file
+			for (const ext of extensions) {
+				const indexPath = path.join(resolvedPath, 'index' + ext);
+				if (fs.existsSync(indexPath)) {
+					return { path: indexPath };
+				}
+			}
+			
+			// Fallback to original behavior
+			return { path: resolvedPath };
 		});
 	},
 };

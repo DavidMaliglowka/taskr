@@ -18,6 +18,18 @@
       {
         "command": "taskr.showKanbanBoard",
         "title": "Task Master Kanban: Show Board"
+      },
+      {
+        "command": "taskr.checkConnection",
+        "title": "Task Master Kanban: Check Connection"
+      },
+      {
+        "command": "taskr.reconnect",
+        "title": "Task Master Kanban: Reconnect"
+      },
+      {
+        "command": "taskr.openSettings",
+        "title": "Task Master Kanban: Open Settings"
       }
     ],
     "configuration": {
@@ -30,12 +42,163 @@
         },
         "taskmaster.mcp.args": {
           "type": "array",
+          "items": {
+            "type": "string"
+          },
           "default": [
             "-y",
             "--package=task-master-ai",
             "task-master-ai"
           ],
           "description": "An array of arguments to pass to the MCP server command."
+        },
+        "taskmaster.mcp.cwd": {
+          "type": "string",
+          "description": "Working directory for the Task Master MCP server (defaults to workspace root)"
+        },
+        "taskmaster.mcp.env": {
+          "type": "object",
+          "description": "Environment variables for the Task Master MCP server"
+        },
+        "taskmaster.mcp.timeout": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 300000,
+          "description": "Connection timeout in milliseconds"
+        },
+        "taskmaster.mcp.maxReconnectAttempts": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum number of reconnection attempts"
+        },
+        "taskmaster.mcp.reconnectBackoffMs": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 100,
+          "maximum": 10000,
+          "description": "Initial reconnection backoff delay in milliseconds"
+        },
+        "taskmaster.mcp.maxBackoffMs": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 300000,
+          "description": "Maximum reconnection backoff delay in milliseconds"
+        },
+        "taskmaster.mcp.healthCheckIntervalMs": {
+          "type": "number",
+          "default": 15000,
+          "minimum": 5000,
+          "maximum": 60000,
+          "description": "Health check interval in milliseconds"
+        },
+        "taskmaster.ui.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh tasks from the server"
+        },
+        "taskmaster.ui.refreshIntervalMs": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 1000,
+          "maximum": 300000,
+          "description": "Auto-refresh interval in milliseconds"
+        },
+        "taskmaster.ui.theme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "description": "UI theme preference"
+        },
+        "taskmaster.ui.showCompletedTasks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show completed tasks in the Kanban board"
+        },
+        "taskmaster.ui.taskDisplayLimit": {
+          "type": "number",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Maximum number of tasks to display"
+        },
+        "taskmaster.ui.showPriority": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show task priority indicators"
+        },
+        "taskmaster.ui.showTaskIds": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show task IDs in the interface"
+        },
+        "taskmaster.performance.maxConcurrentRequests": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum number of concurrent MCP requests"
+        },
+        "taskmaster.performance.requestTimeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 300000,
+          "description": "Request timeout in milliseconds"
+        },
+        "taskmaster.performance.cacheTasksMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Task cache duration in milliseconds"
+        },
+        "taskmaster.performance.lazyLoadThreshold": {
+          "type": "number",
+          "default": 50,
+          "minimum": 10,
+          "maximum": 500,
+          "description": "Number of tasks before enabling lazy loading"
+        },
+        "taskmaster.debug.enableLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable debug logging"
+        },
+        "taskmaster.debug.logLevel": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
+          "default": "info",
+          "description": "Logging level"
+        },
+        "taskmaster.debug.enableConnectionMetrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable connection performance metrics"
+        },
+        "taskmaster.debug.saveEventLogs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Save event logs to files"
+        },
+        "taskmaster.debug.maxEventLogSize": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 10,
+          "maximum": 10000,
+          "description": "Maximum number of events to keep in memory"
         }
       }
     }
@@ -64,7 +227,7 @@
     "@types/vscode": "^1.101.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "autoprefixer": "10.4.21",
     "esbuild": "^0.25.3",
@@ -77,10 +240,22 @@
     "tailwindcss": "4.1.11",
     "typescript": "^5.8.3"
   },
+  "pnpm": {
+    "overrides": {
+      "glob@<8": "^10.4.5",
+      "inflight": "npm:@tootallnate/once@2"
+    }
+  },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-portal": "^1.1.9",
+    "@radix-ui/react-scroll-area": "^1.2.9",
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "lucide-react": "^0.525.0",
     "tailwind-merge": "^3.3.1"
   }
 }
