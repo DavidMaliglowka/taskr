@@ -1,0 +1,391 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Set up project build system",
+        "description": "Configure the project's build system using pnpm, esbuild, React, TypeScript, and Tailwind CSS for the VS Code extension.",
+        "details": "1. Initialize project with `pnpm init`\n2. Install dependencies: `pnpm add -D esbuild react react-dom @types/react @types/react-dom typescript tailwindcss postcss autoprefixer @types/vscode`\n3. Set up TypeScript configuration (tsconfig.json)\n4. Create esbuild configuration for bundling\n5. Set up Tailwind CSS configuration\n6. Create basic folder structure (src/, dist/, etc.)\n7. Add build scripts to package.json\n<info added on 2025-07-01T21:03:19.643Z>\nBuild System Setup Complete:\n\n- Dependencies installed: React 19.1.0, React DOM, TypeScript, Tailwind CSS 4.1.11, esbuild, @modelcontextprotocol/sdk, PostCSS, Autoprefixer\n- Configuration files created: tsconfig.json, tailwind.config.js, postcss.config.js, package.json (updated)\n- Build system (esbuild.js) implemented with dual build contexts for VS Code extension and React webview\n- Project structure established: src/extension.ts, src/webview/, dist/\n- Build verification completed: TypeScript compilation, ESLint, extension and webview builds successful\n- VS Code command \"Task Master Kanban: Show Board\" implemented\n- Basic webview panel with React integration and Tailwind CSS styling\n- Mock Kanban board with 4 columns created\n- Security measures implemented with CSP and nonce for script execution\n- Foundation ready for MCP server integration and real Task Master data\n</info added on 2025-07-01T21:03:19.643Z>",
+        "testStrategy": "Verify that the build process completes without errors and produces the expected output files. Run a test build and check that all necessary files are generated in the dist/ directory.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement MCP server spawning and client connection",
+        "description": "Create the logic to start the task-master-ai MCP server process and establish a client connection using the @modelcontextprotocol/sdk.",
+        "details": "1. Install @modelcontextprotocol/sdk: `pnpm add @modelcontextprotocol/sdk`\n2. Use child_process.spawn to start the MCP server based on user configuration\n3. Implement error handling for server startup failures\n4. Create an MCP client using @modelcontextprotocol/sdk\n5. Establish connection to the spawned process's stdio\n6. Implement basic error handling and reconnection logic",
+        "testStrategy": "Create unit tests to ensure the server spawning process works correctly. Test the MCP client connection by attempting to call a simple MCP tool and verifying the response.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement basic MCP server spawning",
+            "description": "Create a function to spawn an MCP server with minimal configuration",
+            "dependencies": [],
+            "details": "1. Import necessary modules (e.g., 'net', 'events')\n2. Define a function 'spawnMCPServer(port)'\n3. Create a TCP server using net.createServer()\n4. Listen on the specified port\n5. Log server start message\n6. Handle basic 'connection' event\n7. Test with a simple client connection",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement client connection handling",
+            "description": "Enhance the server to properly handle client connections and disconnections",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Create a 'handleConnection(socket)' function\n2. Implement 'data' event handler for incoming messages\n3. Implement 'end' event handler for client disconnection\n4. Implement 'error' event handler for connection errors\n5. Add connected clients to a Map or Set for tracking\n6. Remove disconnected clients from the tracking structure\n7. Test with multiple client connections and disconnections",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement configuration management",
+            "description": "Create a configuration system for the MCP server",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "1. Create a 'config.js' file to store server configuration\n2. Implement loading configuration from a JSON file\n3. Add configuration options for port, max clients, timeout, etc.\n4. Create a function to validate and sanitize configuration\n5. Modify 'spawnMCPServer' to accept a config object\n6. Implement error handling for invalid configurations\n7. Test server spawning with different configurations",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement comprehensive error handling",
+            "description": "Add robust error handling throughout the MCP server code",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "1. Create custom error classes for different error types\n2. Implement try-catch blocks in critical sections\n3. Add error logging with severity levels\n4. Handle 'uncaughtException' and 'unhandledRejection' events\n5. Implement graceful server shutdown on critical errors\n6. Add error recovery mechanisms where possible\n7. Test error handling with various error scenarios",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement user-configurable settings",
+        "description": "Add user-configurable settings for the MCP server command and arguments in the extension's package.json and implement the logic to read these settings.",
+        "details": "1. Add the 'contributes' section to package.json as specified in the PRD\n2. Implement a function to read the configuration using vscode.workspace.getConfiguration\n3. Use the configuration values when spawning the MCP server process\n4. Add error handling for invalid configurations",
+        "testStrategy": "Create test cases with different configuration values and ensure the extension correctly reads and applies these settings when spawning the MCP server.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and implement settings UI",
+            "description": "Create a user-friendly settings page within VS Code for configuring extension options",
+            "dependencies": [],
+            "details": "1. Design a layout for the settings page using VS Code's webview API\n2. Implement HTML/CSS for the settings form\n3. Add input fields for each configurable option (e.g., API key, model selection, temperature)\n4. Include appropriate labels and descriptions for each setting\n5. Implement a 'Save' button to store user preferences",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement settings validation and storage",
+            "description": "Add input validation for user settings and integrate with VS Code's configuration storage",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Implement client-side validation for each input field (e.g., API key format, temperature range)\n2. Create error messages for invalid inputs\n3. Use VS Code's `workspace.getConfiguration()` and `update()` methods to read/write settings\n4. Implement error handling for configuration updates\n5. Add a confirmation message when settings are successfully saved",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate settings with extension functionality",
+            "description": "Ensure the extension uses the user-configured settings throughout its operations",
+            "dependencies": [
+              2
+            ],
+            "details": "1. Modify existing API calls to use the stored API key and model selection\n2. Update prompt generation logic to incorporate user-defined temperature setting\n3. Implement a settings change listener to update extension behavior in real-time\n4. Add error handling for cases where required settings are missing or invalid\n5. Write unit tests to verify correct application of user settings in various scenarios",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Create basic Webview panel with React",
+        "description": "Set up a Webview panel in VS Code that loads a basic React application.",
+        "details": "1. Use vscode.window.createWebviewPanel to create a new Webview\n2. Set up a basic React application structure\n3. Implement a simple 'Hello World' React component\n4. Configure content security policy for the Webview\n5. Load the bundled React app into the Webview",
+        "testStrategy": "Manually test the extension to ensure the Webview opens and displays the React 'Hello World' component correctly. Verify that the Webview respects VS Code's theming.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up basic VS Code extension with Webview",
+            "description": "Create a new VS Code extension project and implement a basic Webview panel",
+            "dependencies": [],
+            "details": "1. Use 'yo code' to scaffold a new extension\n2. Implement a command to open a Webview panel\n3. Create a basic HTML structure for the Webview\n4. Test the Webview opens correctly",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Integrate React into the Webview",
+            "description": "Set up React within the Webview, including necessary build processes",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Install React and related dependencies\n2. Set up Webpack for bundling React code\n3. Create a basic React component in the Webview\n4. Implement hot reloading for development\n5. Test React renders correctly in the Webview",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement state management and VS Code API integration",
+            "description": "Add state management to the React app and integrate with VS Code extension API",
+            "dependencies": [
+              2
+            ],
+            "details": "1. Choose and set up a state management solution (e.g., Redux)\n2. Implement message passing between extension and Webview\n3. Create actions and reducers for VS Code API interactions\n4. Add error handling for API calls\n5. Write unit tests for state management logic",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Integrate shadcn/ui Kanban component",
+        "description": "Add the shadcn/ui Kanban component to the React application and style it with Tailwind CSS.",
+        "details": "1. Install shadcn/ui: `pnpm add @shadcn/ui`\n2. Set up the necessary Tailwind CSS configuration for shadcn/ui\n3. Import and implement the Kanban component in the React app\n4. Create placeholder data for initial testing\n5. Style the Kanban board to match VS Code's theming using Tailwind CSS",
+        "testStrategy": "Visually inspect the Kanban board in the Webview to ensure it renders correctly with placeholder data and respects the VS Code theme. Test responsiveness by resizing the VS Code window.",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up shadcn/ui Kanban component",
+            "description": "Install and configure the shadcn/ui Kanban component in the VS Code extension project",
+            "dependencies": [],
+            "details": "1. Install shadcn/ui and its dependencies\n2. Import the Kanban component\n3. Create a basic implementation in the extension's UI\n4. Test the component renders correctly in VS Code",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Customize Kanban component for VS Code theming",
+            "description": "Modify the Kanban component's styles to match VS Code's theme and design language",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Analyze VS Code's theming system and color variables\n2. Override shadcn/ui default styles with VS Code-specific CSS\n3. Implement dynamic theme switching based on VS Code's current theme\n4. Test appearance in light and dark modes",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement responsive design for Kanban component",
+            "description": "Ensure the Kanban component is fully responsive within VS Code's various panel sizes and layouts",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "1. Implement CSS media queries for different VS Code panel sizes\n2. Adjust component layout and sizing for optimal display in sidebars and full-width views\n3. Test responsiveness by resizing VS Code windows and panels\n4. Implement touch-friendly interactions for VS Code's web version",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement get_tasks MCP tool integration",
+        "description": "Use the MCP client to call the get_tasks tool and retrieve task data from the task-master-ai server.",
+        "details": "1. Implement a function to call the get_tasks MCP tool\n2. Parse the JSON response and map it to the Task interface\n3. Implement error handling for failed requests\n4. Add logging for debugging purposes",
+        "testStrategy": "Create unit tests that mock the MCP client and verify that the get_tasks function correctly parses and returns task data. Test error handling by simulating failed requests.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement basic MCP API connection",
+            "description": "Set up the initial connection to the MCP API for the get_tasks tool integration",
+            "dependencies": [],
+            "details": "1. Create a new file 'mcp_api.py'\n2. Implement a function to establish connection with MCP API using appropriate authentication\n3. Create a basic get_tasks function that fetches raw task data\n4. Implement error handling for connection issues and API errors\n5. Write unit tests for the connection and basic data retrieval",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Develop data transformation logic",
+            "description": "Create functions to transform raw MCP task data into the required format for the AI system",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Analyze the structure of raw MCP task data\n2. Design a data model for transformed tasks\n3. Implement transformation functions to convert raw data to the desired format\n4. Handle edge cases and data inconsistencies\n5. Write unit tests for data transformation functions\n6. Implement logging for transformation errors and inconsistencies",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement caching strategy",
+            "description": "Develop a caching mechanism to optimize performance and reduce API calls",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "1. Choose an appropriate caching library (e.g., Redis, memcached)\n2. Implement cache read/write functions for task data\n3. Modify get_tasks function to check cache before making API calls\n4. Implement cache invalidation strategy\n5. Add cache hit/miss logging\n6. Write integration tests for the caching mechanism\n7. Perform performance testing to validate caching effectiveness",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Connect backend data to React frontend",
+        "description": "Pass the task data retrieved from the MCP server to the React application and render it in the Kanban board.",
+        "details": "1. Implement a message passing system between the extension host and Webview\n2. Create a React context to manage task state\n3. Implement a useEffect hook to fetch tasks on component mount\n4. Update the Kanban component to use real task data\n5. Implement loading and error states in the UI",
+        "testStrategy": "Test the end-to-end flow by running the extension, verifying that tasks are fetched from the server, and confirming that they are correctly displayed in the Kanban board. Test loading and error states by simulating slow connections and server errors.",
+        "priority": "high",
+        "dependencies": [
+          5,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Redux store and actions",
+            "description": "Implement Redux store configuration and create actions for data fetching",
+            "dependencies": [],
+            "details": "1. Install Redux and related packages\n2. Create store configuration file\n3. Define action types for data fetching\n4. Implement action creators for API calls\n5. Set up root reducer",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement API service layer",
+            "description": "Create a service layer to handle API requests and responses",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Set up Axios or Fetch for API calls\n2. Create API endpoints configuration\n3. Implement methods for each API endpoint\n4. Add error handling and response parsing\n5. Create unit tests for API service functions",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Develop Redux thunks for asynchronous operations",
+            "description": "Create Redux thunks to handle asynchronous data fetching and state updates",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "1. Implement thunks for each data fetching operation\n2. Add loading states to Redux store\n3. Handle success and error cases in thunks\n4. Implement data caching strategy\n5. Create unit tests for thunks",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Connect React components to Redux store",
+            "description": "Integrate Redux state and actions into React components",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "1. Use useSelector and useDispatch hooks in components\n2. Implement data fetching in useEffect hooks\n3. Add loading and error states to components\n4. Optimize re-renders using memoization techniques\n5. Implement lazy loading for large data sets",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Implement drag-and-drop functionality",
+        "description": "Add drag-and-drop functionality to the Kanban board for moving tasks between columns.",
+        "details": "1. Implement drag event handlers in the React components\n2. Update local state when a task is dragged to a new column\n3. Implement animation for smooth drag-and-drop experience\n4. Ensure accessibility by adding keyboard support for task movement",
+        "testStrategy": "Manually test drag-and-drop functionality across different columns. Verify that the UI updates immediately after a drop. Test keyboard accessibility by moving tasks using only keyboard commands.",
+        "priority": "high",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Implement update_task MCP tool integration",
+        "description": "Use the MCP client to call the update_task tool when a task's status is changed via drag-and-drop.",
+        "details": "1. Implement a function to call the update_task MCP tool\n2. Create a message handler in the extension host to receive update requests from the Webview\n3. Call update_task when a drag-and-drop action is completed\n4. Implement optimistic updates in the UI\n5. Handle errors and rollback optimistic updates if the server request fails",
+        "testStrategy": "Create unit tests for the update_task function. Implement integration tests that simulate drag-and-drop actions and verify that the correct MCP tool calls are made. Test error scenarios and ensure proper rollback of optimistic updates.",
+        "priority": "high",
+        "dependencies": [
+          6,
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Implement real-time sync via polling",
+        "description": "Create a polling mechanism to periodically fetch updated task data and keep the Kanban board in sync with the server.",
+        "details": "1. Implement a setInterval loop in the extension host to call get_tasks every 5 seconds\n2. Compare the new task list with the current one to detect changes\n3. If changes are detected, send the updated list to the Webview\n4. Implement a message handler in the React app to receive and apply updates\n5. Ensure smooth UI updates without disrupting user interactions",
+        "testStrategy": "Test the polling mechanism by making changes to tasks outside the extension (e.g., via CLI) and verifying that the changes appear in the Kanban board within the expected time frame. Verify that ongoing user interactions (like dragging a card) are not disrupted by incoming updates.",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Implement error handling and user notifications",
+        "description": "Add comprehensive error handling throughout the extension and implement a notification system to inform users of important events or errors.",
+        "details": "1. Implement a centralized error handling mechanism\n2. Use vscode.window.showErrorMessage for critical errors\n3. Implement a toast notification system in the React app for less critical messages\n4. Add error boundaries to React components to prevent complete UI crashes\n5. Implement logging for all errors and important events",
+        "testStrategy": "Create a test suite that simulates various error conditions (network errors, invalid data, etc.) and verify that appropriate error messages are displayed. Check that errors are properly logged and that the UI gracefully handles error states.",
+        "priority": "medium",
+        "dependencies": [
+          9,
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Finalize VS Code integration and packaging",
+        "description": "Complete the VS Code-specific integration tasks and prepare the extension for packaging and distribution.",
+        "details": "1. Implement activation events in package.json\n2. Create commands for showing/hiding the Kanban board\n3. Add an extension icon and update manifest details\n4. Write user documentation and add it to the extension's README\n5. Implement telemetry (respecting user privacy)\n6. Set up CI/CD for automated testing and packaging\n7. Prepare for VS Code Marketplace submission",
+        "testStrategy": "Perform end-to-end testing of the extension in a clean VS Code environment. Verify all commands work as expected. Review documentation for completeness. Test the packaged extension (VSIX file) to ensure all assets are correctly included.",
+        "priority": "medium",
+        "dependencies": [
+          11
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-01T20:55:39.412Z",
+      "updated": "2025-07-01T21:14:27.445Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

@@ -1,0 +1,201 @@
+<context>
+# **Product Requirements Document: Task Master Kanban VS Code Extension**
+
+## **Overview**
+
+This document outlines the requirements for a Visual Studio Code extension that provides a rich, visual Kanban board interface for the `task-master` productivity tool.
+
+Currently, `task-master` is a powerful command-line tool. However, managing tasks through text commands lacks the intuitive, at-a-glance workflow that visual tools provide. This extension solves that problem by rendering tasks on a Kanban board directly within the user's primary development environment, VS Code.
+
+It's for developers and power users who already leverage `task-master` and want to seamlessly integrate its task management capabilities into their coding workflow. The value is in boosting productivity by eliminating context switching between the terminal and the editor, offering a more fluid and visual way to manage projects.
+
+Instead of parsing CLI text, the extension will communicate directly with a `task-master` background server via the **Model Context Protocol (MCP)**, ensuring reliable, structured data exchange for a stable and responsive user experience.
+
+-----
+
+## **Core Features**
+
+### 1\. Kanban Board Display
+
+  * **What it does:** Renders a fully interactive Kanban board inside a dedicated VS Code editor tab. The board will display columns corresponding to task statuses (e.g., "Backlog," "To Do," "In Progress," "Done").
+  * **Why it's important:** This is the core of the product. It transforms abstract task lists into a visual, actionable workflow, which is a proven method for improving project clarity and tracking progress.
+  * **How it works:** The extension will open a VS Code Webview. This Webview will host a React application that renders the board, columns, and individual task cards using `shadcn/ui` components and Tailwind CSS for styling.
+
+### 2\. Real-time Task Synchronization
+
+  * **What it does:** Fetches all tasks from the `task-master` server on startup and allows users to update a task's status by dragging and dropping it from one column to another.
+  * **Why it's important:** Ensures the visual board is always a true representation of the underlying task data. The drag-and-drop functionality makes updating tasks frictionless and intuitive.
+  * **How it works:** The extension's backend will spawn and maintain a connection to the `task-master` MCP server. It will use the `@modelcontextprotocol/sdk` to call the `get_tasks` tool to populate the board. When a user drags a card, the React frontend sends a message to the extension backend, which then calls the `update_task` tool with the new status via MCP.
+
+### 3\. Seamless VS Code Integration & Configuration
+
+  * **What it does:** The extension will feel like a native part of VS Code. It will respect the user's theme and provide settings for customization.
+  * **Why it's important:** A native feel increases adoption and user satisfaction. Making the server path configurable is crucial for supporting different user setups and environments (e.g., Homebrew vs. custom install paths).
+  * **How it works:** The UI will use VS Code's theme CSS variables and components from `shadcn/ui` to match the editor's look. The `package.json` will define configuration points that allow the user to specify the command and arguments needed to launch the `task-master-ai` server, which the extension will read using the `vscode.workspace.getConfiguration` API.
+
+-----
+
+## **User Experience**
+
+### User Personas
+
+  * **The Power User Developer:** This user lives in their code editor and terminal. They use `task-master` for all their personal and professional projects. They value efficiency and want to minimize context switching. They are comfortable with VS Code and expect tools to integrate smoothly into their environment.
+
+### Key User Flows
+
+1.  **Installation & Setup:** The user installs the extension from the VS Code Marketplace. If their `task-master-ai` executable isn't in the default `npx` path, they navigate to the VS Code settings and update the path.
+2.  **Opening the Board:** The user opens the Command Palette (`Ctrl+Shift+P`) and runs the command "Task Master Kanban: Show Board." A new editor tab opens, displaying their Kanban board.
+3.  **Managing Tasks:** The user views their tasks, which are automatically fetched and sorted into the correct columns. They drag a task card from the "To Do" column to the "In Progress" column. The change is saved instantly.
+
+### UI/UX Considerations
+
+  * **Native Feel:** The UI must be clean, responsive, and styled to match the user's active VS Code theme. `shadcn/ui` and Tailwind CSS will be used to achieve this.
+  * **Clarity:** The board should be easy to read at a glance. Task cards will display the title and other essential metadata.
+  * **Location:** The board will open in a standard **editor tab**, allowing users to arrange it alongside their code files, split the view, or move it between editor groups just like any other file.
+</context>
+
+<PRD>
+
+## **Technical Architecture**
+
+### System Components
+
+1.  **VS Code Extension Host:** The main Node.js process for the extension. It manages the Webview panel, handles command registration, and runs the MCP client.
+2.  **MCP Server Process:** A long-running background process of `task-master-ai` spawned and managed by the Extension Host. All communication goes through this server.
+3.  **Webview (React UI):** A sandboxed browser environment running within a VS Code tab. It hosts the React application that renders the Kanban board. It communicates with the Extension Host via an asynchronous message-passing API.
+
+### Data Models
+
+The primary data model is the **Task object**, which will be consistent with the JSON structure provided by the `task-master` MCP server.
+
+```typescript
+interface Task {
+  id: string;
+  title: string;
+  status: string; // e.g., 'todo', 'in-progress', 'done'
+  createdAt: string; // ISO 8601 timestamp
+  // ... any other fields provided by the 'get_tasks' tool
+}
+```
+
+### APIs and Integrations
+
+  * **VS Code Extension API:** Used for creating the Webview panel (`createWebviewPanel`), registering commands (`registerCommand`), and managing configuration (`workspace.getConfiguration`).
+  * **Model Context Protocol (MCP):** The core integration.
+      * The extension will use `child_process.spawn` to start the server defined in the user's settings (e.g., `npx -y --package=task-master-ai task-master-ai`).
+      * The `@modelcontextprotocol/sdk` will be used to create a client that connects to the spawned process's `stdio`.
+      * The client will call tools like `get_tasks` and `update_task` and handle the structured JSON responses.
+
+### Infrastructure Requirements
+
+  * **User Environment:** Visual Studio Code, Node.js, and `pnpm`.
+  * **Dependencies:** `react`, `tailwindcss`, `esbuild`, `@modelcontextprotocol/sdk`, `shadcn-ui`. The `task-master-ai` package must be accessible to the system, typically via `npx`.
+
+-----
+
+## **Development Roadmap**
+
+### MVP Requirements
+
+The goal of the MVP is to deliver the core value proposition: a visual, interactive board for managing existing tasks.
+
+1.  **Phase 1: Foundation & Backend Connection**
+
+      * Set up the project with `pnpm`, `esbuild`, `React`, and `Tailwind CSS`.
+      * Implement the logic to start the `task-master-ai` MCP server process from the extension.
+      * Implement the MCP client to connect to the server and successfully call the `get_tasks` tool, logging the results.
+      * Implement user-configurable settings for the server command and arguments.
+
+2.  **Phase 2: Read-Only UI**
+
+      * Create a Webview panel that loads a basic React app.
+      * Integrate the `shadcn.io` Kanban component.
+      * Fetch tasks from the MCP server and pass them to the React app.
+      * Render the tasks as cards in the correct columns on a **read-only** board.
+
+3.  **Phase 3: Interactivity**
+
+      * Implement drag-and-drop functionality for task cards between columns.
+      * When a card is dropped, send a message from the Webview to the extension host containing the `taskId` and `newStatus`.
+      * The extension host receives the message and calls the `update_task` tool via the MCP client.
+      * Refresh the board to reflect the change.
+
+4. **Phase 4: Real-Time Sync via Polling**
+
+    * Implement a setInterval loop in the extension host.
+
+* This loop will call the get_tasks MCP tool periodically (e.g., every 5 seconds).
+
+I* f the returned task list differs from the current one, push the updated list to the Webview for a re-render. This ensures the board reflects external changes made via the CLI or other clients.
+
+### Future Enhancements
+
+Once the MVP is stable, development can focus on adding more task management features.
+
+  * **Task Creation:** Add a "+" button to columns to create new tasks directly from the UI.
+  * **Task Editing:** Allow users to click on a task card to open a modal where they can edit the title, description, and other properties.
+  * **Task Deletion:** Add a "delete" button to task cards.
+  * **Advanced Filtering:** Add a search bar or filter controls to quickly find specific tasks on the board.
+  * **Real-time Updates:** Implement a listener for server-side events (if supported by MCP) to automatically refresh the board when tasks are changed by an external process.
+
+-----
+
+## **Logical Dependency Chain**
+
+Development must follow a strict order to ensure a visible, testable front-end is available as quickly as possible.
+
+1.  **Build System First:** Configure `esbuild`, `pnpm`, and `Tailwind CSS`. Without a working build process, no UI can be developed.
+2.  **Establish Backend Connection:** Implement the MCP server spawning and client connection. This is the foundational data layer and can be tested independently by logging task data to the console.
+3.  **Static UI Mockup:** Build the React components for the Kanban board and cards using hardcoded, placeholder data. This allows for rapid UI development and styling without waiting for the backend.
+4.  **Connect Backend to Frontend (Read-Only):** Replace the hardcoded data in the React app with live data fetched from the MCP client. At this point, the core read functionality is complete and testable.
+5.  **Enable Frontend-to-Backend Interactivity:** Implement the drag-and-drop message passing. This is the final step to achieve full MVP functionality, building upon the now-stable data and UI layers.
+
+-----
+
+## **Risks and Mitigations**
+
+  * **Technical Challenge: Build Process Complexity**
+
+      * **Risk:** Integrating `esbuild`, `React`, `TypeScript`, and `Tailwind CSS` into the unique VS Code Webview context can be complex and error-prone.
+      * **Mitigation:** Follow the detailed step-by-step build guide already created. Keep the build script simple and well-documented.
+
+  * **Technical Challenge: Asynchronous Communication**
+
+      * **Risk:** Properly managing the asynchronous message passing between the Webview (frontend) and the Extension Host (backend) can lead to race conditions or state mismatches.
+      * **Mitigation:** Define a clear and simple message-passing contract. Ensure all state updates are unidirectional (e.g., UI sends an action, backend processes it and sends back the new state).
+
+  * **Scoping Risk: MVP Scope Creep**
+
+      * **Risk:** The temptation to add "just one more feature" (like task creation or editing) to the MVP can delay the initial release and increase complexity.
+      * **Mitigation:** Adhere strictly to the defined MVP scope: **Read tasks and update status via drag-and-drop.** All other features are explicitly designated as "Future Enhancements" and will not be considered until after the MVP is shipped and validated.
+
+-----
+
+## **Appendix**
+
+### `package.json` Configuration Snippet
+
+The following `contributes` section should be added to `package.json` to allow users to configure the MCP server path.
+
+```json
+{
+  "contributes": {
+    "configuration": {
+      "title": "Task Master Kanban",
+      "properties": {
+        "taskmaster.mcp.command": {
+          "type": "string",
+          "default": "npx",
+          "description": "The command or absolute path to execute for the MCP server (e.g., 'npx' or '/usr/local/bin/task-master-ai')."
+        },
+        "taskmaster.mcp.args": {
+            "type": "array",
+            "default": ["-y", "--package=task-master-ai", "task-master-ai"],
+            "description": "An array of arguments to pass to the MCP server command."
+        }
+      }
+    }
+  }
+}
+```
+</PRD> 

@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* shadcn/ui CSS variables */
+@layer base {
+  :root {
+    /* VS Code CSS variables will be injected here */
+    color-scheme: var(--vscode-theme-kind, light);
+    
+    /* shadcn/ui variables - adapted for VS Code */
+    --background: var(--vscode-editor-background);
+    --foreground: var(--vscode-foreground);
+    --card: var(--vscode-editor-background);
+    --card-foreground: var(--vscode-foreground);
+    --popover: var(--vscode-editor-background);
+    --popover-foreground: var(--vscode-foreground);
+    --primary: var(--vscode-button-background);
+    --primary-foreground: var(--vscode-button-foreground);
+    --secondary: var(--vscode-button-secondaryBackground);
+    --secondary-foreground: var(--vscode-button-secondaryForeground);
+    --muted: var(--vscode-input-background);
+    --muted-foreground: var(--vscode-input-foreground);
+    --accent: var(--vscode-focusBorder);
+    --accent-foreground: var(--vscode-foreground);
+    --destructive: var(--vscode-errorForeground);
+    --destructive-foreground: var(--vscode-foreground);
+    --border: var(--vscode-panel-border);
+    --input: var(--vscode-input-background);
+    --ring: var(--vscode-focusBorder);
+    --radius: 0.5rem;
+  }
+}
+
+/* Reset body to match VS Code styles instead of Tailwind defaults */
+@layer base {
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: var(--vscode-editor-background) !important;
+    color: var(--vscode-foreground) !important;
+    font-family: var(--vscode-font-family) !important;
+    font-size: var(--vscode-font-size) !important;
+    font-weight: var(--vscode-font-weight) !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Ensure root container takes full space */
+  #root {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  /* Override any conflicting Tailwind defaults for VS Code integration */
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Ensure buttons and inputs use VS Code styling */
+  button, input, select, textarea {
+    font-family: inherit;
+  }
+}
+
+/* Custom scrollbar to match VS Code */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--vscode-scrollbarSlider-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-hoverBackground);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-activeBackground);
+} 
