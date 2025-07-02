@@ -257,6 +257,86 @@ export class TaskMasterApi {
   }
 
   /**
+   * Update task content using the update_task MCP tool
+   */
+  async updateTask(taskId: string, updates: {
+    title?: string;
+    description?: string;
+    details?: string;
+    priority?: 'high' | 'medium' | 'low';
+    testStrategy?: string;
+    dependencies?: string[];
+  }, options?: {
+    projectRoot?: string;
+    append?: boolean;
+    research?: boolean;
+  }): Promise<TaskMasterApiResponse<boolean>> {
+    const startTime = Date.now();
+
+    try {
+      // Build the prompt for the update_task MCP tool
+      const updateFields: string[] = [];
+      
+      if (updates.title !== undefined) {
+        updateFields.push(`Title: ${updates.title}`);
+      }
+      if (updates.description !== undefined) {
+        updateFields.push(`Description: ${updates.description}`);
+      }
+      if (updates.details !== undefined) {
+        updateFields.push(`Details: ${updates.details}`);
+      }
+      if (updates.priority !== undefined) {
+        updateFields.push(`Priority: ${updates.priority}`);
+      }
+      if (updates.testStrategy !== undefined) {
+        updateFields.push(`Test Strategy: ${updates.testStrategy}`);
+      }
+      if (updates.dependencies !== undefined) {
+        updateFields.push(`Dependencies: ${updates.dependencies.join(', ')}`);
+      }
+
+      const prompt = `Update task with the following changes:\n${updateFields.join('\n')}`;
+
+      const mcpArgs: Record<string, unknown> = {
+        id: taskId,
+        prompt: prompt,
+        projectRoot: options?.projectRoot || this.getWorkspaceRoot()
+      };
+
+      // Add optional parameters
+      if (options?.append !== undefined) {
+        mcpArgs.append = options.append;
+      }
+      if (options?.research !== undefined) {
+        mcpArgs.research = options.research;
+      }
+
+      console.log('TaskMasterApi: Calling update_task with args:', mcpArgs);
+
+      await this.callMCPTool('update_task', mcpArgs);
+      
+      // Clear relevant caches
+      this.clearCachePattern('get_tasks');
+
+      return {
+        success: true,
+        data: true,
+        requestDuration: Date.now() - startTime
+      };
+
+    } catch (error) {
+      console.error('TaskMasterApi: Error updating task:', error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        requestDuration: Date.now() - startTime
+      };
+    }
+  }
+
+  /**
    * Get current Task Master connection status
    */
   getConnectionStatus(): { isConnected: boolean; error?: string } {

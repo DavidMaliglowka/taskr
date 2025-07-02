@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { shouldShowNotification, getNotificationType, getToastDuration } from './notificationPreferences';
 
 export enum ErrorSeverity {
   LOW = 'low',
@@ -14,7 +15,62 @@ export enum ErrorCategory {
   UI_RENDERING = 'ui_rendering',
   VALIDATION = 'validation',
   NETWORK = 'network',
-  INTERNAL = 'internal'
+  INTERNAL = 'internal',
+  TASK_MASTER_API = 'TASK_MASTER_API',
+  DATA_VALIDATION = 'DATA_VALIDATION',
+  DATA_PARSING = 'DATA_PARSING',
+  TASK_DATA_CORRUPTION = 'TASK_DATA_CORRUPTION',
+  VSCODE_API = 'VSCODE_API',
+  WEBVIEW = 'WEBVIEW',
+  EXTENSION_HOST = 'EXTENSION_HOST',
+  USER_INTERACTION = 'USER_INTERACTION',
+  DRAG_DROP = 'DRAG_DROP',
+  COMPONENT_RENDER = 'COMPONENT_RENDER',
+  PERMISSION = 'PERMISSION',
+  FILE_SYSTEM = 'FILE_SYSTEM',
+  UNKNOWN = 'UNKNOWN'
+}
+
+export enum NotificationType {
+  VSCODE_INFO = 'VSCODE_INFO',
+  VSCODE_WARNING = 'VSCODE_WARNING',
+  VSCODE_ERROR = 'VSCODE_ERROR',
+  TOAST_SUCCESS = 'TOAST_SUCCESS',
+  TOAST_INFO = 'TOAST_INFO',
+  TOAST_WARNING = 'TOAST_WARNING',
+  TOAST_ERROR = 'TOAST_ERROR',
+  CONSOLE_ONLY = 'CONSOLE_ONLY',
+  SILENT = 'SILENT'
+}
+
+export interface ErrorContext {
+  // Core error information
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  message: string;
+  originalError?: Error | unknown;
+  
+  // Contextual information
+  operation?: string;        // What operation was being performed
+  taskId?: string;          // Related task ID if applicable
+  userId?: string;          // User context if applicable
+  sessionId?: string;       // Session context
+  
+  // Technical details
+  stackTrace?: string;
+  userAgent?: string;
+  timestamp?: number;
+  
+  // Recovery information
+  isRecoverable?: boolean;
+  suggestedActions?: string[];
+  documentationLink?: string;
+  
+  // Notification preferences
+  notificationType?: NotificationType;
+  showToUser?: boolean;
+  logToConsole?: boolean;
+  logToFile?: boolean;
 }
 
 export interface ErrorDetails {
@@ -392,26 +448,57 @@ export class ErrorHandler {
   }
 
   /**
-   * Show user notification based on error severity
+   * Show user notification based on error severity and user preferences
    */
   private async showUserNotification(errorDetails: ErrorDetails): Promise<void> {
+    // Check if user wants to see this notification
+    if (!shouldShowNotification(errorDetails.category, errorDetails.severity)) {
+      return;
+    }
+
+    const notificationType = getNotificationType(errorDetails.category, errorDetails.severity);
     const message = errorDetails.userAction 
       ? `${errorDetails.message} ${errorDetails.userAction}`
       : errorDetails.message;
 
-    switch (errorDetails.severity) {
-      case ErrorSeverity.CRITICAL:
+    // Handle different notification types based on user preferences
+    switch (notificationType) {
+      case 'VSCODE_ERROR':
         await vscode.window.showErrorMessage(message);
         break;
-      case ErrorSeverity.HIGH:
-        await vscode.window.showErrorMessage(message);
-        break;
-      case ErrorSeverity.MEDIUM:
+      case 'VSCODE_WARNING':
         await vscode.window.showWarningMessage(message);
         break;
-      case ErrorSeverity.LOW:
+      case 'VSCODE_INFO':
         await vscode.window.showInformationMessage(message);
         break;
+      case 'TOAST_SUCCESS':
+      case 'TOAST_INFO':
+      case 'TOAST_WARNING':
+      case 'TOAST_ERROR':
+        // These will be handled by the webview toast system
+        // The error listener in extension.ts will send these to webview
+        break;
+      case 'CONSOLE_ONLY':
+      case 'SILENT':
+        // No user notification, just console logging
+        break;
+      default:
+        // Fallback to severity-based notifications
+        switch (errorDetails.severity) {
+          case ErrorSeverity.CRITICAL:
+            await vscode.window.showErrorMessage(message);
+            break;
+          case ErrorSeverity.HIGH:
+            await vscode.window.showErrorMessage(message);
+            break;
+          case ErrorSeverity.MEDIUM:
+            await vscode.window.showWarningMessage(message);
+            break;
+          case ErrorSeverity.LOW:
+            await vscode.window.showInformationMessage(message);
+            break;
+        }
     }
   }
 
@@ -576,4 +663,125 @@ export function createAutoRecoveryAction(action: () => Promise<void>, descriptio
     action,
     description
   };
+}
+
+// Default error categorization rules
+export const ERROR_CATEGORIZATION_RULES: Record<string, ErrorCategory> = {
+  // Network patterns
+  'ECONNREFUSED': ErrorCategory.NETWORK,
+  'ENOTFOUND': ErrorCategory.NETWORK,
+  'ETIMEDOUT': ErrorCategory.NETWORK,
+  'Network request failed': ErrorCategory.NETWORK,
+  'fetch failed': ErrorCategory.NETWORK,
+  
+  // MCP patterns
+  'MCP': ErrorCategory.MCP_CONNECTION,
+  'Task Master': ErrorCategory.TASK_MASTER_API,
+  'polling': ErrorCategory.TASK_MASTER_API,
+  
+  // VS Code patterns
+  'vscode': ErrorCategory.VSCODE_API,
+  'webview': ErrorCategory.WEBVIEW,
+  'extension': ErrorCategory.EXTENSION_HOST,
+  
+  // Data patterns
+  'JSON': ErrorCategory.DATA_PARSING,
+  'parse': ErrorCategory.DATA_PARSING,
+  'validation': ErrorCategory.DATA_VALIDATION,
+  'invalid': ErrorCategory.DATA_VALIDATION,
+  
+  // Permission patterns
+  'EACCES': ErrorCategory.PERMISSION,
+  'EPERM': ErrorCategory.PERMISSION,
+  'permission': ErrorCategory.PERMISSION,
+  
+  // File system patterns
+  'ENOENT': ErrorCategory.FILE_SYSTEM,
+  'EISDIR': ErrorCategory.FILE_SYSTEM,
+  'file': ErrorCategory.FILE_SYSTEM
+};
+
+// Severity mapping based on error categories  
+export const CATEGORY_SEVERITY_MAPPING: Record<ErrorCategory, ErrorSeverity> = {
+  [ErrorCategory.NETWORK]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.MCP_CONNECTION]: ErrorSeverity.HIGH,
+  [ErrorCategory.TASK_MASTER_API]: ErrorSeverity.HIGH,
+  [ErrorCategory.DATA_VALIDATION]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.DATA_PARSING]: ErrorSeverity.HIGH,
+  [ErrorCategory.TASK_DATA_CORRUPTION]: ErrorSeverity.CRITICAL,
+  [ErrorCategory.VSCODE_API]: ErrorSeverity.HIGH,
+  [ErrorCategory.WEBVIEW]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.EXTENSION_HOST]: ErrorSeverity.CRITICAL,
+  [ErrorCategory.USER_INTERACTION]: ErrorSeverity.LOW,
+  [ErrorCategory.DRAG_DROP]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.COMPONENT_RENDER]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.PERMISSION]: ErrorSeverity.CRITICAL,
+  [ErrorCategory.FILE_SYSTEM]: ErrorSeverity.HIGH,
+  [ErrorCategory.CONFIGURATION]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.UNKNOWN]: ErrorSeverity.HIGH,
+  // Legacy mappings for existing categories
+  [ErrorCategory.TASK_LOADING]: ErrorSeverity.HIGH,
+  [ErrorCategory.UI_RENDERING]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.VALIDATION]: ErrorSeverity.MEDIUM,
+  [ErrorCategory.INTERNAL]: ErrorSeverity.HIGH
+};
+
+// Notification type mapping based on severity
+export const SEVERITY_NOTIFICATION_MAPPING: Record<ErrorSeverity, NotificationType> = {
+  [ErrorSeverity.LOW]: NotificationType.TOAST_INFO,
+  [ErrorSeverity.MEDIUM]: NotificationType.TOAST_WARNING,
+  [ErrorSeverity.HIGH]: NotificationType.VSCODE_WARNING,
+  [ErrorSeverity.CRITICAL]: NotificationType.VSCODE_ERROR
+};
+
+/**
+ * Automatically categorize an error based on its message and type
+ */
+export function categorizeError(error: Error | unknown, operation?: string): ErrorCategory {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
+  const searchText = `${errorMessage} ${errorStack || ''} ${operation || ''}`.toLowerCase();
+  
+  for (const [pattern, category] of Object.entries(ERROR_CATEGORIZATION_RULES)) {
+    if (searchText.includes(pattern.toLowerCase())) {
+      return category;
+    }
+  }
+  
+  return ErrorCategory.UNKNOWN;
+}
+
+export function getSuggestedSeverity(category: ErrorCategory): ErrorSeverity {
+  return CATEGORY_SEVERITY_MAPPING[category] || ErrorSeverity.HIGH;
+}
+
+export function getSuggestedNotificationType(severity: ErrorSeverity): NotificationType {
+  return SEVERITY_NOTIFICATION_MAPPING[severity] || NotificationType.CONSOLE_ONLY;
+}
+
+export function createErrorContext(
+  error: Error | unknown,
+  operation?: string,
+  overrides?: Partial<ErrorContext>
+): ErrorContext {
+  const category = categorizeError(error, operation);
+  const severity = getSuggestedSeverity(category);
+  const notificationType = getSuggestedNotificationType(severity);
+  
+  const baseContext: ErrorContext = {
+    category,
+    severity,
+    message: error instanceof Error ? error.message : String(error),
+    originalError: error,
+    operation,
+    timestamp: Date.now(),
+    stackTrace: error instanceof Error ? error.stack : undefined,
+    isRecoverable: severity !== ErrorSeverity.CRITICAL,
+    notificationType,
+    showToUser: severity === ErrorSeverity.HIGH || severity === ErrorSeverity.CRITICAL,
+    logToConsole: true,
+    logToFile: severity === ErrorSeverity.HIGH || severity === ErrorSeverity.CRITICAL
+  };
+  
+  return { ...baseContext, ...overrides };
 } 
