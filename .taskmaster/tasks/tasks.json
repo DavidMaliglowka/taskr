@@ -616,11 +616,85 @@
             "testStrategy": ""
           }
         ]
+      },
+      {
+        "id": 13,
+        "title": "Implement Task Details Screen with Two-Column Layout",
+        "description": "Create a comprehensive task details view component that displays individual task information in a responsive two-column layout, integrating with the existing MCP client for data fetching and updates.",
+        "details": "1. Set up the basic component structure:\n   - Create a new React component named `TaskDetailsView`\n   - Use Tailwind CSS for responsive layout (CSS Grid or Flexbox)\n   - Implement the two-column layout (2/3 for main content, 1/3 for sidebar)\n   - Add responsive behavior for mobile (stack vertically below md breakpoint)\n\n2. Implement the left column:\n   - Add Breadcrumb component from shadcn/ui for navigation\n   - Display task name as main header (h1 element)\n   - Implement editable description area using shadcn/ui Textarea\n   - Add placeholder text \"Add description...\" when empty\n\n3. Implement the right column (properties sidebar):\n   - Use shadcn/ui Card component as a container\n   - Add sections for complexity, priority, and status using Label and Badge components\n   - Implement dependencies section with title and clickable task links\n\n4. Integrate with MCP client:\n   - Use the existing get_tasks function to fetch task data\n   - Implement a new function to fetch a single task's details if needed\n   - Use the update_task function for saving changes to the description\n\n5. Implement navigation between tasks:\n   - Add click handlers to dependency links to load other task details\n   - Update the URL or state to reflect the currently viewed task\n\n6. Ensure accessibility:\n   - Use semantic HTML elements (e.g., &lt;main&gt;, &lt;aside&gt;, &lt;section&gt;)\n   - Add proper ARIA labels to all interactive elements\n   - Implement keyboard navigation for all interactive elements\n   - Ensure proper focus management when loading new task details\n\n7. Style the component:\n   - Use Tailwind CSS classes for consistent styling\n   - Integrate with the existing VS Code theme variables\n   - Ensure all text is readable and has sufficient contrast\n\n8. Optimize performance:\n   - Implement lazy loading for task dependencies\n   - Use React.memo or useMemo for expensive computations\n   - Implement virtualization if dealing with long lists of dependencies\n\n9. Add error handling:\n   - Display user-friendly error messages if data fetching fails\n   - Implement error boundaries to prevent UI crashes\n\n10. Implement state management:\n    - Use React hooks (useState, useEffect) for local state management\n    - Consider using Context API or Redux for global state if needed",
+        "testStrategy": "1. Unit Testing:\n   - Write unit tests for all individual components (TaskDetailsView, Breadcrumb, Description editor, etc.)\n   - Test responsive behavior using Jest and React Testing Library's screen size utilities\n   - Verify that the component renders correctly with different task data\n\n2. Integration Testing:\n   - Test integration with MCP client functions (get_tasks, update_task)\n   - Verify that task data is correctly displayed and updated\n   - Test navigation between tasks via dependency links\n\n3. Accessibility Testing:\n   - Use automated tools like jest-axe for basic accessibility checks\n   - Manually test keyboard navigation and screen reader compatibility\n   - Verify proper focus management when loading new task details\n\n4. Visual Regression Testing:\n   - Implement screenshot tests to ensure consistent styling across different themes\n   - Test responsive layout at various screen sizes\n\n5. Performance Testing:\n   - Measure and set benchmarks for component render times\n   - Test performance with large datasets (many dependencies)\n\n6. User Acceptance Testing:\n   - Conduct user testing sessions to gather feedback on usability and design\n   - Verify that the layout and information hierarchy meet user expectations\n\n7. Cross-browser Testing:\n   - Test the component in different browsers supported by VS Code\n\n8. Error Handling:\n   - Simulate various error conditions (network errors, invalid data) and verify appropriate error messages are displayed\n\n9. State Management:\n   - Test that state updates correctly when editing task details\n   - Verify that navigation between tasks preserves and updates state correctly\n\n10. End-to-end Testing:\n    - Create Cypress or Playwright tests to simulate user interactions with the task details view\n    - Test the full flow from Kanban board to task details and back",
+        "status": "pending",
+        "dependencies": [
+          6,
+          9,
+          11
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up basic component structure and routing",
+            "description": "Create the TaskDetailsView component with a two-column layout and implement routing for individual task views.",
+            "dependencies": [],
+            "details": "Create a new React component named TaskDetailsView. Use Tailwind CSS to implement a responsive two-column layout (2/3 for main content, 1/3 for sidebar). Add responsive behavior for mobile (stack vertically below md breakpoint). Set up routing to handle individual task views.\n<info added on 2025-07-02T18:23:10.296Z>\n**Exact Layout Requirements**:\n- Left column: 2/3 width (roughly two-thirds)\n- Right column: 1/3 width (remaining one-third)\n- Mobile behavior: Stack vertically at 'md' breakpoint (main content first, sidebar below)\n- Use Tailwind CSS Grid or Flexbox\n\n**Component Structure**:\nCreate TaskDetailsView component that accepts a taskId prop and determines if it's a task or subtask for proper breadcrumb navigation hierarchy.\n\n**Layout Implementation Options**:\n- CSS Grid: `grid-cols-1 md:grid-cols-3` with `md:col-span-2` for main, `md:col-span-1` for sidebar\n- Flexbox: `flex-col md:flex-row` with `md:w-2/3` for main, `md:w-1/3` for sidebar\n\n**Routing Requirements**:\nSupport URLs like `/tasks/13` (for task 13) and `/tasks/13.2` (for subtask 13.2) to determine navigation hierarchy.\n</info added on 2025-07-02T18:23:10.296Z>",
+            "status": "pending",
+            "testStrategy": "Verify component renders correctly and responsive layout works as expected. Test routing functionality for different task IDs."
+          },
+          {
+            "id": 2,
+            "title": "Implement left column main content",
+            "description": "Add breadcrumb, header, and editable description area to the left column of the TaskDetailsView.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add Breadcrumb component from shadcn/ui for navigation. Display task name as main header (h1 element). Implement editable description area using shadcn/ui Textarea with placeholder text 'Add description...' when empty.\n<info added on 2025-07-02T18:22:18.263Z>\n**Specific Component Implementation Details:**\n\n**Breadcrumb Navigation Components:**\n```jsx\nimport {\n  Breadcrumb,\n  BreadcrumbItem,\n  BreadcrumbLink,\n  BreadcrumbList,\n  BreadcrumbSeparator,\n} from \"@/components/ui/breadcrumb\"\n```\nNavigation structure:\n- For tasks: Kanban Board → Current Task\n- For subtasks: Kanban Board → Parent Task → Current Subtask\n\n**Task Name Styling:**\nApply Tailwind classes: `text-2xl font-bold tracking-tight` to h1 element\n\n**Description Area Components:**\n```jsx\nimport { Label } from \"@/components/ui/label\"\nimport { Textarea } from \"@/components/ui/textarea\"\n\n<div className=\"grid w-full gap-1.5\">\n  <Label htmlFor=\"description\">Description</Label>\n  <Textarea placeholder=\"Add description...\" id=\"description\" />\n</div>\n```\n</info added on 2025-07-02T18:22:18.263Z>",
+            "status": "pending",
+            "testStrategy": "Test breadcrumb navigation, header display, and editable description functionality. Ensure placeholder text appears when description is empty."
+          },
+          {
+            "id": 3,
+            "title": "Implement right column properties sidebar",
+            "description": "Create a sidebar in the right column to display task properties such as complexity, priority, status, and dependencies.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use shadcn/ui Card component as a container for the sidebar. Add sections for complexity, priority, and status using Label and Badge components. Implement dependencies section with title and clickable task links.\n<info added on 2025-07-02T18:22:46.586Z>\n**Required shadcn/ui Components**:\n- Badge from \"@/components/ui/badge\"\n- Card, CardContent, CardHeader, CardTitle from \"@/components/ui/card\"\n- Separator from \"@/components/ui/separator\"\n- Button from \"@/components/ui/button\"\n\n**Exact Implementation Structure**:\nCard container with \"Properties\" header in CardHeader with CardTitle. CardContent uses \"grid gap-4\" className with flex containers for status and priority rows, each using \"items-center justify-between\" with text-muted-foreground labels and Badge components (variant=\"secondary\" for status, variant=\"destructive\" for priority). Include Separator component between properties and dependencies section. Dependencies section has h4 with \"text-sm font-medium\" classes for title.\n\n**Dependencies Implementation**:\nUse Button component with variant=\"link\", asChild prop, className=\"p-0 h-auto justify-start\" wrapping Link components that navigate to \"/tasks/[taskId]\" format for clickable task references.\n</info added on 2025-07-02T18:22:46.586Z>",
+            "status": "pending",
+            "testStrategy": "Verify all task properties are displayed correctly in the sidebar. Test clickable dependency links."
+          },
+          {
+            "id": 4,
+            "title": "Integrate MCP client for data fetching and updates",
+            "description": "Implement data fetching and updating using the existing MCP client functions.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Use the existing get_tasks function to fetch task data. Implement a new function to fetch a single task's details if needed. Use the update_task function for saving changes to the description. Ensure proper error handling for failed data fetching.",
+            "status": "pending",
+            "testStrategy": "Test data fetching for individual tasks and updating task descriptions. Verify error handling for failed API calls."
+          },
+          {
+            "id": 5,
+            "title": "Implement navigation, state management, and finalize responsive design",
+            "description": "Add navigation between tasks, implement state management, and ensure responsive design and accessibility.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Add click handlers to dependency links to load other task details. Update the URL or state to reflect the currently viewed task. Use React hooks for local state management. Implement lazy loading for task dependencies. Ensure all interactive elements are keyboard accessible and have proper ARIA labels. Finalize responsive design for all screen sizes.",
+            "status": "pending",
+            "testStrategy": "Test navigation between tasks, state updates, and URL changes. Verify responsive design on various screen sizes. Conduct accessibility testing for keyboard navigation and screen reader compatibility."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-07-01T20:55:39.412Z",
-      "updated": "2025-07-02T00:38:08.333Z",
+      "updated": "2025-07-02T18:19:18.266Z",
       "description": "Tasks for master context"
     }
   }
