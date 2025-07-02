@@ -296,12 +296,12 @@ export function createMCPConfigFromSettings(): MCPConfig {
   let command = config.get<string>('mcp.command', 'npx');
   const args = config.get<string[]>('mcp.args', ['-y', '--package=task-master-ai', 'task-master-ai']);
   
-  // TEMPORARY: Hardcode the working directory to test if this fixes the issue
-  const hardcodedCwd = '/Users/david/Developer/Gauntlet/taskr-test-website';
-  const cwd = config.get<string>('mcp.cwd', hardcodedCwd);
+  // Use proper VS Code workspace detection
+  const defaultCwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+  const cwd = config.get<string>('mcp.cwd', defaultCwd);
   const env = config.get<Record<string, string>>('mcp.env');
   
-  console.log('🔧 HARDCODED CWD TEST - Using directory:', hardcodedCwd);
+  console.log('✅ Using workspace directory:', defaultCwd);
 
   // If using default 'npx', try to find the full path on macOS/Linux
   if (command === 'npx') {
@@ -329,7 +329,7 @@ export function createMCPConfigFromSettings(): MCPConfig {
   return { 
     command, 
     args, 
-    cwd: cwd || hardcodedCwd,
+    cwd: cwd || defaultCwd,
     env 
   };
 } 

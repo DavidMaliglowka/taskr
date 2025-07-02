@@ -39,7 +39,7 @@ export interface TaskMasterTask {
   id: string;
   title: string;
   description: string;
-  status: 'pending' | 'in-progress' | 'review' | 'done' | 'blocked' | 'cancelled' | 'deferred';
+  status: 'pending' | 'in-progress' | 'review' | 'done' | 'deferred' | 'cancelled';
   priority: 'high' | 'medium' | 'low';
   details?: string;
   testStrategy?: string;
@@ -968,10 +968,10 @@ export class TaskMasterApi {
       'finished': 'done',
       'closed': 'done',
       'resolved': 'done',
-      'blocked': 'blocked',
-      'block': 'blocked',
-      'stuck': 'blocked',
-      'waiting': 'blocked',
+          'blocked': 'deferred',
+    'block': 'deferred', 
+    'stuck': 'deferred',
+    'waiting': 'deferred',
       'cancelled': 'cancelled',
       'canceled': 'cancelled',
       'cancel': 'cancelled',

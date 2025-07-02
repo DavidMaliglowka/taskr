@@ -19,7 +19,7 @@ interface TaskMasterTask {
   id: string;
   title: string;
   description: string;
-  status: 'pending' | 'in-progress' | 'done' | 'blocked' | 'review';
+  status: 'pending' | 'in-progress' | 'done' | 'deferred' | 'review';
   priority: 'high' | 'medium' | 'low';
   dependencies?: string[];
   details?: string;
@@ -372,7 +372,7 @@ const kanbanStatuses: Status[] = [
   { id: 'in-progress', name: 'In Progress', color: '#F59E0B' },
   { id: 'review', name: 'Review', color: '#8B5CF6' },
   { id: 'done', name: 'Done', color: '#10B981' },
-  { id: 'blocked', name: 'Blocked', color: '#EF4444' },
+      { id: 'deferred', name: 'Deferred', color: '#EF4444' },
 ];
 
 // State reducer
