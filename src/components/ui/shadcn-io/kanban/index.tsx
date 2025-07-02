@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -55,6 +56,8 @@ export type KanbanCardProps = Pick<Feature, 'id' | 'name'> & {
   parent: string;
   children?: ReactNode;
   className?: string;
+  onClick?: (event: React.MouseEvent) => void;
+  onDoubleClick?: (event: React.MouseEvent) => void;
 };
 
 export const KanbanCard = ({
@@ -64,6 +67,8 @@ export const KanbanCard = ({
   parent,
   children,
   className,
+  onClick,
+  onDoubleClick,
 }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -71,11 +76,79 @@ export const KanbanCard = ({
       data: { index, parent },
     });
 
+  const [dragStartTime, setDragStartTime] = React.useState(0);
+  const [dragStartPos, setDragStartPos] = React.useState<{x: number, y: number} | null>(null);
+  const [isDragOperation, setIsDragOperation] = React.useState(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setDragStartTime(Date.now());
+    setDragStartPos({ x: e.clientX, y: e.clientY });
+    setIsDragOperation(false);
+    
+    // Call the original drag listener
+    if (listeners?.onMouseDown) {
+      listeners.onMouseDown(e);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (dragStartPos) {
+      const currentPos = { x: e.clientX, y: e.clientY };
+      const distance = Math.sqrt(
+        Math.pow(currentPos.x - dragStartPos.x, 2) + 
+        Math.pow(currentPos.y - dragStartPos.y, 2)
+      );
+      
+      // If significant movement detected, mark as drag operation
+      if (distance > 8) {
+        setIsDragOperation(true);
+      }
+    }
+    
+    // Call the original drag listener
+    if (listeners?.onMouseMove) {
+      listeners.onMouseMove(e);
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    const clickDuration = Date.now() - dragStartTime;
+    
+    // Only handle click if it's a quick action with minimal movement (not a drag)
+    if (!isDragOperation && clickDuration < 500) {
+      // Small delay to ensure drag operations are complete
+      setTimeout(() => {
+        if (!isDragging) {
+          onClick?.(e);
+        }
+      }, 10);
+    }
+    
+    // Reset state
+    setDragStartTime(0);
+    setDragStartPos(null);
+    setIsDragOperation(false);
+    
+    // Call the original drag listener
+    if (listeners?.onMouseUp) {
+      listeners.onMouseUp(e);
+    }
+  };
+
+  // Merge drag listeners with our custom handlers
+  const mergedListeners = {
+    ...listeners,
+    onMouseDown: handleMouseDown,
+    onMouseMove: handleMouseMove,
+    onMouseUp: handleMouseUp,
+  };
+
   return (
     <Card
       className={cn(
         'rounded-md p-3 shadow-sm',
         isDragging && 'cursor-grabbing',
+        !isDragging && 'cursor-pointer',
         className
       )}
       style={{
@@ -83,8 +156,9 @@ export const KanbanCard = ({
           ? `translateX(${transform.x}px) translateY(${transform.y}px)`
           : 'none',
       }}
-      {...listeners}
       {...attributes}
+      {...mergedListeners}
+      onDoubleClick={onDoubleClick}
       ref={setNodeRef}
     >
       {children ?? <p className="m-0 font-medium text-sm">{name}</p>}

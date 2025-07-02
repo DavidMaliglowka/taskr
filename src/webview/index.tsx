@@ -14,8 +14,11 @@ import {
   type Feature,
 } from '@/components/ui/shadcn-io/kanban';
 
+// Import TaskDetailsView component
+import TaskDetailsView from '../components/TaskDetailsView';
+
 // TypeScript interfaces for Task Master integration
-interface TaskMasterTask {
+export interface TaskMasterTask {
   id: string;
   title: string;
   description: string;
@@ -25,6 +28,7 @@ interface TaskMasterTask {
   details?: string;
   testStrategy?: string;
   subtasks?: TaskMasterTask[];
+  complexityScore?: number;
 }
 
 interface WebviewMessage {
@@ -69,10 +73,13 @@ interface AppState {
   };
   // Toast notifications
   toastNotifications: ToastNotification[];
+  // Navigation state
+  currentView: 'kanban' | 'task-details';
+  selectedTaskId?: string;
 }
 
 // Add interface for task updates
-interface TaskUpdates {
+export interface TaskUpdates {
   title?: string;
   description?: string;
   details?: string;
@@ -99,7 +106,9 @@ type AppAction =
   | { type: 'LOAD_CACHED_TASKS'; payload: TaskMasterTask[] }
   | { type: 'ADD_TOAST'; payload: ToastNotification }
   | { type: 'REMOVE_TOAST'; payload: string }
-  | { type: 'CLEAR_ALL_TOASTS' };
+  | { type: 'CLEAR_ALL_TOASTS' }
+  | { type: 'NAVIGATE_TO_TASK'; payload: string }
+  | { type: 'NAVIGATE_TO_KANBAN' };
 
 // Toast notification interfaces
 interface ToastNotification {
@@ -426,13 +435,19 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, toastNotifications: state.toastNotifications.filter(n => n.id !== action.payload) };
     case 'CLEAR_ALL_TOASTS':
       return { ...state, toastNotifications: [] };
+    case 'NAVIGATE_TO_TASK':
+      console.log('📍 Reducer: Navigating to task', action.payload);
+      return { ...state, currentView: 'task-details', selectedTaskId: action.payload };
+    case 'NAVIGATE_TO_KANBAN':
+      console.log('📍 Reducer: Navigating to kanban');
+      return { ...state, currentView: 'kanban', selectedTaskId: undefined };
     default:
       return state;
   }
 };
 
 // Context for VS Code API
-const VSCodeContext = createContext<{
+export const VSCodeContext = createContext<{
   vscode?: ReturnType<NonNullable<typeof window.acquireVsCodeApi>>;
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
@@ -625,23 +640,29 @@ const TaskCard: React.FC<{
   index: number;
   status: string;
   onEdit?: (task: TaskMasterTask) => void;
-}> = ({ task, index, status, onEdit }) => {
+  onViewDetails?: (taskId: string) => void;
+}> = ({ task, index, status, onEdit, onViewDetails }) => {
+  const handleClick = (e: React.MouseEvent) => {
+    onViewDetails?.(task.id);
+  };
+  
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    onViewDetails?.(task.id);
+  };
+
   return (
     <KanbanCard 
       id={task.id} 
       name={task.title} 
       index={index} 
       parent={status}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       className="
-        kanban-card
-        p-3 w-full
+        w-full
         min-h-[120px]
-        touch-manipulation
-        cursor-grab active:cursor-grabbing
-        select-none
         border border-vscode-border/50
         bg-vscode-input/80 hover:bg-vscode-input
-        rounded-md
         flex-shrink-0
       "
     >
@@ -651,16 +672,6 @@ const TaskCard: React.FC<{
             {task.title}
           </h3>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.(task);
-              }}
-              className="w-6 h-6 flex items-center justify-center rounded text-vscode-foreground/60 hover:text-vscode-foreground hover:bg-vscode-border/30 transition-colors"
-              title="Edit task"
-            >
-              ✏️
-            </button>
             <PriorityBadge priority={task.priority} />
           </div>
         </div>
@@ -692,7 +703,7 @@ const TaskMasterKanban: React.FC = () => {
   if (!context) throw new Error('TaskMasterKanban must be used within VSCodeContext');
 
   const { state, dispatch, sendMessage, availableHeight } = context;
-  const { tasks, loading, error, editingTask, polling } = state;
+  const { tasks, loading, error, editingTask, polling, currentView, selectedTaskId } = state;
 
   // Calculate header height for proper kanban board sizing
   const headerHeight = 73; // Header with padding and border
@@ -904,6 +915,8 @@ const TaskMasterKanban: React.FC = () => {
     );
   }
 
+
+
   return (
     <>
       <div 
@@ -994,6 +1007,13 @@ const TaskMasterKanban: React.FC = () => {
                                 payload: { taskId: task.id, editData: task }
                               });
                             }}
+                            onViewDetails={(taskId) => {
+                              console.log('🔍 Navigating to task details:', taskId);
+                              dispatch({
+                                type: 'NAVIGATE_TO_TASK',
+                                payload: taskId
+                              });
+                            }}
                           />
                         ))}
                       </KanbanCards>
@@ -1047,6 +1067,8 @@ const App: React.FC = () => {
       connectionStatus: 'online'
     },
     toastNotifications: [],
+    currentView: 'kanban',
+    selectedTaskId: undefined,
   });
 
   const [vscode] = useState(() => {
@@ -1390,7 +1412,19 @@ const App: React.FC = () => {
           )
         });
       }}>
-        <TaskMasterKanban />
+        {/* Conditional rendering for different views */}
+        {(() => {
+          console.log('🎯 App render - currentView:', state.currentView, 'selectedTaskId:', state.selectedTaskId);
+          return state.currentView === 'task-details' && state.selectedTaskId ? (
+            <TaskDetailsView 
+              taskId={state.selectedTaskId}
+              onNavigateBack={() => dispatch({ type: 'NAVIGATE_TO_KANBAN' })}
+              onNavigateToTask={(taskId: string) => dispatch({ type: 'NAVIGATE_TO_TASK', payload: taskId })}
+            />
+          ) : (
+            <TaskMasterKanban />
+          );
+        })()}
         <ToastContainer 
           notifications={state.toastNotifications}
           onDismiss={(id) => dispatch({ type: 'REMOVE_TOAST', payload: id })}
