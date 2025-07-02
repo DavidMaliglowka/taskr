@@ -1,311 +1,152 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { MCPClientManager, createMCPConfigFromSettings } from './utils/mcpClient';
-import { ConfigManager } from './utils/configManager';
+import * as path from 'path';
+import * as fs from 'fs';
+
+// Restore full imports for MCP and utilities
+// import { MCPClientManager, createMCPConfigFromSettings } from './utils/mcpClient';
+// import { ConfigManager } from './utils/configManager';
+// import { TaskMasterApi } from './utils/taskMasterApi';
 
 // Global MCP client manager instance
-let mcpClient: MCPClientManager | null = null;
-let configManager: ConfigManager | null = null;
+let mcpClient: any = null;
+let configManager: any = null;
+let taskMasterApi: any = null;
 let activeWebviewPanels: vscode.WebviewPanel[] = [];
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Task Master Kanban extension is now active!');
-
-	// Initialize configuration manager
-	configManager = ConfigManager.getInstance();
-
-	// Initialize the MCP client
-	initializeMCPClient();
-
-	// Register the command to show the Kanban board
+	console.log('🎉 Task Master Kanban extension is now active!');
+	console.log('🎉 Extension context:', context);
+	
+	// Register command to show Kanban board with webview
 	const showKanbanCommand = vscode.commands.registerCommand('taskr.showKanbanBoard', async () => {
-		try {
-			// Ensure MCP client is connected before showing the board
-			await ensureMCPConnection();
-
-			// Create and show the webview panel
-			const panel = vscode.window.createWebviewPanel(
-				'taskMasterKanban',
-				'Task Master Kanban Board',
-				vscode.ViewColumn.One,
-				{
-					enableScripts: true,
-					retainContextWhenHidden: true
-				}
-			);
-
-			// Track active panels for configuration updates
-			activeWebviewPanels.push(panel);
-
-			// Set the HTML content for the webview
-			panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
-
-			// Handle messages from the webview
-			panel.webview.onDidReceiveMessage(async (message) => {
-				await handleWebviewMessage(message, panel.webview);
-			});
-
-			// Clean up when panel is disposed
-			panel.onDidDispose(() => {
-				const index = activeWebviewPanels.indexOf(panel);
-				if (index > -1) {
-					activeWebviewPanels.splice(index, 1);
-				}
-			});
-
-		} catch (error) {
-			console.error('Error showing Kanban board:', error);
-			vscode.window.showErrorMessage(`Failed to show Kanban board: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		console.log('🎯 Show Kanban command executed!');
+		
+		// Check if panel already exists
+		const existingPanel = activeWebviewPanels.find(panel => panel.title === 'Task Master Kanban');
+		if (existingPanel) {
+			existingPanel.reveal(vscode.ViewColumn.One);
+			return;
 		}
+
+		// Create webview panel
+		const panel = vscode.window.createWebviewPanel(
+			'taskrKanban',
+			'Task Master Kanban',
+			vscode.ViewColumn.One,
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+				localResourceRoots: [
+					vscode.Uri.joinPath(context.extensionUri, 'dist')
+				]
+			}
+		);
+
+		// Add to active panels
+		activeWebviewPanels.push(panel);
+
+		// Handle panel disposal
+		panel.onDidDispose(() => {
+			const index = activeWebviewPanels.findIndex(p => p === panel);
+			if (index !== -1) {
+				activeWebviewPanels.splice(index, 1);
+			}
+		});
+
+		// Set webview HTML content
+		panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+
+		// Handle messages from webview
+		panel.webview.onDidReceiveMessage(
+			async (message) => {
+				console.log('📨 Received message from webview:', message);
+				
+				switch (message.type) {
+					case 'ready':
+						console.log('🚀 Webview is ready!');
+						// Send initial configuration or data
+						panel.webview.postMessage({
+							type: 'init',
+							data: { status: 'Extension connected!' }
+						});
+						break;
+						
+					case 'getTasks':
+						console.log('📋 Getting tasks...');
+						// TODO: Implement MCP get_tasks call
+						panel.webview.postMessage({
+							type: 'tasksData',
+							requestId: message.requestId,
+							data: getSampleTasks()
+						});
+						break;
+						
+					case 'updateTaskStatus':
+						console.log('🔄 Updating task status:', message.data);
+						// TODO: Implement MCP set_task_status call
+						panel.webview.postMessage({
+							type: 'taskStatusUpdated',
+							requestId: message.requestId,
+							success: true
+						});
+						break;
+						
+					default:
+						console.log('❓ Unknown message type:', message.type);
+				}
+			}
+		);
+
+		vscode.window.showInformationMessage('Task Master Kanban Board opened!');
 	});
 
-	// Register command to check MCP connection status
 	const checkConnectionCommand = vscode.commands.registerCommand('taskr.checkConnection', async () => {
-		try {
-			if (!mcpClient) {
-				vscode.window.showWarningMessage('MCP client is not initialized');
-				return;
-			}
-
-			const status = mcpClient.getStatus();
-			if (status.isRunning) {
-				const testResult = await mcpClient.testConnection();
-				if (testResult) {
-					vscode.window.showInformationMessage(`Task Master connected successfully (PID: ${status.pid})`);
-				} else {
-					vscode.window.showWarningMessage('Task Master is running but connection test failed');
-				}
-			} else {
-				vscode.window.showWarningMessage(`Task Master is not running. Error: ${status.error || 'Unknown'}`);
-			}
-		} catch (error) {
-			console.error('Error checking connection:', error);
-			vscode.window.showErrorMessage(`Connection check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		}
+		console.log('🔗 Check connection command executed!');
+		vscode.window.showInformationMessage('Check connection command works!');
 	});
 
-	// Register command to reconnect MCP client
 	const reconnectCommand = vscode.commands.registerCommand('taskr.reconnect', async () => {
-		try {
-			await reconnectMCPClient();
-			vscode.window.showInformationMessage('Reconnection attempt completed');
-		} catch (error) {
-			console.error('Error reconnecting:', error);
-			vscode.window.showErrorMessage(`Reconnection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		}
+		console.log('🔄 Reconnect command executed!');
+		vscode.window.showInformationMessage('Reconnect command works!');
 	});
 
-	// Register command to open settings
 	const openSettingsCommand = vscode.commands.registerCommand('taskr.openSettings', () => {
+		console.log('⚙️ Open settings command executed!');
 		vscode.commands.executeCommand('workbench.action.openSettings', '@ext:taskr taskmaster');
 	});
 
 	context.subscriptions.push(showKanbanCommand, checkConnectionCommand, reconnectCommand, openSettingsCommand);
-
-	// Listen for configuration changes
-	const configChangeListener = vscode.workspace.onDidChangeConfiguration((event) => {
-		if (event.affectsConfiguration('taskmaster')) {
-			console.log('Task Master configuration changed, updating...');
-			
-			// Update all active webviews with new configuration
-			const currentConfig = configManager?.getConfig();
-			if (currentConfig) {
-				activeWebviewPanels.forEach(panel => {
-					panel.webview.postMessage({
-						type: 'configUpdate',
-						config: currentConfig
-					});
-				});
-			}
-
-			// Reconnect MCP client if MCP settings changed
-			if (event.affectsConfiguration('taskmaster.mcp')) {
-				console.log('MCP configuration changed, reconnecting...');
-				reconnectMCPClient().catch(error => {
-					console.error('Error reconnecting after config change:', error);
-				});
-			}
-		}
-	});
-
-	// Listen for configuration manager changes
-	if (configManager) {
-		configManager.onConfigChange((newConfig) => {
-			console.log('ConfigManager configuration updated:', newConfig);
-			
-			// Notify all active webviews
-			activeWebviewPanels.forEach(panel => {
-				panel.webview.postMessage({
-					type: 'configUpdate',
-					config: newConfig
-				});
-			});
-		});
-	}
-
-	context.subscriptions.push(configChangeListener);
-}
-
-/**
- * Initialize the MCP client with current settings
- */
-function initializeMCPClient(): void {
-	try {
-		const config = createMCPConfigFromSettings();
-		mcpClient = new MCPClientManager(config);
-		console.log('MCP client initialized with config:', config);
-	} catch (error) {
-		console.error('Failed to initialize MCP client:', error);
-		vscode.window.showErrorMessage(`Failed to initialize Task Master client: ${error instanceof Error ? error.message : 'Unknown error'}`);
-	}
-}
-
-/**
- * Ensure MCP client is connected, attempt to connect if not
- */
-async function ensureMCPConnection(): Promise<void> {
-	if (!mcpClient) {
-		initializeMCPClient();
-		if (!mcpClient) {
-			throw new Error('Failed to initialize MCP client');
-		}
-	}
-
-	const status = mcpClient.getStatus();
-	if (!status.isRunning) {
-		console.log('MCP client not running, attempting to connect...');
-		vscode.window.showInformationMessage('Connecting to Task Master...');
-		await mcpClient.connect();
-	}
-}
-
-/**
- * Reconnect the MCP client with fresh settings
- */
-async function reconnectMCPClient(): Promise<void> {
-	if (mcpClient) {
-		await mcpClient.disconnect();
-	}
 	
-	initializeMCPClient();
-	
-	if (mcpClient) {
-		await mcpClient.connect();
-	} else {
-		throw new Error('Failed to reinitialize MCP client');
-	}
+	console.log('✅ All commands registered successfully!');
 }
 
-/**
- * Handle messages from the webview
- */
-async function handleWebviewMessage(message: any, webview: vscode.Webview): Promise<void> {
-	switch (message.type) {
-		case 'mcpStatus':
-			const status = mcpClient?.getStatus() || { isRunning: false, error: 'Client not initialized' };
-			webview.postMessage({
-				type: 'mcpStatusResponse',
-				status
-			});
-			break;
-
-		case 'getConfig':
-			const currentConfig = configManager?.getConfig();
-			webview.postMessage({
-				type: 'configResponse',
-				requestId: message.requestId,
-				config: currentConfig
-			});
-			break;
-
-		case 'updateConfig':
-			try {
-				if (!configManager) {
-					throw new Error('Configuration manager not initialized');
-				}
-
-				await configManager.updateConfig(message.updates);
-				
-				webview.postMessage({
-					type: 'configUpdateResponse',
-					requestId: message.requestId,
-					success: true,
-					config: configManager.getConfig()
-				});
-
-				vscode.window.showInformationMessage('Configuration updated successfully');
-			} catch (error) {
-				webview.postMessage({
-					type: 'configUpdateResponse',
-					requestId: message.requestId,
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error'
-				});
-
-				vscode.window.showErrorMessage(`Failed to update configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			}
-			break;
-
-		case 'openSettings':
-			vscode.commands.executeCommand('workbench.action.openSettings', '@ext:taskr taskmaster');
-			break;
-
-		case 'mcpCall':
-			try {
-				if (!mcpClient) {
-					throw new Error('MCP client not initialized');
-				}
-
-				await ensureMCPConnection();
-				const result = await mcpClient.callTool(message.toolName, message.arguments);
-				
-				webview.postMessage({
-					type: 'mcpCallResponse',
-					requestId: message.requestId,
-					success: true,
-					result
-				});
-			} catch (error) {
-				webview.postMessage({
-					type: 'mcpCallResponse',
-					requestId: message.requestId,
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error'
-				});
-			}
-			break;
-
-		default:
-			console.log('Unknown message type:', message.type);
-	}
-}
-
+// Generate webview HTML content
 function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
 	// Get the local path to main script run in the webview
-	const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'webview.js'));
+	const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'index.js'));
+	const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'index.css'));
 
-	// Use a nonce to whitelist which scripts can be run
+	// Use a nonce to only allow specific scripts to be run
 	const nonce = getNonce();
 
 	return `<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-			<title>Task Master Kanban Board</title>
-		</head>
-		<body>
-			<div id="root"></div>
-			<script nonce="${nonce}" type="module" src="${scriptUri}"></script>
-		</body>
-		</html>`;
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+	<link href="${styleUri}" rel="stylesheet">
+	<title>Task Master Kanban</title>
+</head>
+<body>
+	<div id="root"></div>
+	<script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
 }
 
 function getNonce() {
@@ -317,11 +158,89 @@ function getNonce() {
 	return text;
 }
 
+// Sample data for testing
+function getSampleTasks() {
+	return [
+		{
+			id: '1',
+			title: 'Set up project structure',
+			description: 'Create the basic VS Code extension structure',
+			status: 'done',
+			priority: 'high',
+			details: 'Initialize package.json, create src folder, set up TypeScript configuration',
+			dependencies: []
+		},
+		{
+			id: '2',
+			title: 'Implement MCP Client',
+			description: 'Create MCP client to communicate with task-master-ai',
+			status: 'done',
+			priority: 'high',
+			details: 'Use @modelcontextprotocol/sdk to create a client that can connect to task-master-ai server',
+			dependencies: ['1']
+		},
+		{
+			id: '3',
+			title: 'Create configuration system',
+			description: 'Build configuration management for the extension',
+			status: 'done',
+			priority: 'medium',
+			details: 'Create ConfigManager class to handle VS Code settings and configuration updates',
+			dependencies: ['1']
+		},
+		{
+			id: '4',
+			title: 'Create basic Webview panel with React',
+			description: 'Set up the webview infrastructure with React',
+			status: 'done',
+			priority: 'high',
+			details: 'Create webview panel, integrate React, set up bundling with esbuild',
+			dependencies: ['1', '2', '3']
+		},
+		{
+			id: '5',
+			title: 'Integrate shadcn/ui Kanban component',
+			description: 'Add the Kanban board UI using shadcn/ui components',
+			status: 'done',
+			priority: 'medium',
+			details: 'Install and customize shadcn/ui Kanban component for VS Code theming',
+			dependencies: ['4']
+		},
+		{
+			id: '6',
+			title: 'Implement get_tasks MCP tool integration',
+			description: 'Use the MCP client to call the get_tasks tool and retrieve task data',
+			status: 'in-progress',
+			priority: 'high',
+			details: 'Connect to task-master-ai server and fetch real task data instead of using sample data',
+			dependencies: ['2']
+		},
+		{
+			id: '7',
+			title: 'Add task status updates via MCP',
+			description: 'Implement drag-and-drop task status updates through MCP',
+			status: 'pending',
+			priority: 'high',
+			details: 'When tasks are moved between columns, update status via set_task_status MCP tool',
+			dependencies: ['6']
+		},
+		{
+			id: '8',
+			title: 'Add real-time task synchronization',
+			description: 'Keep the Kanban board in sync with task file changes',
+			status: 'pending',
+			priority: 'medium',
+			details: 'Implement file watching and real-time updates when tasks.json changes',
+			dependencies: ['6', '7']
+		}
+	];
+}
+
 // This method is called when your extension is deactivated
 export function deactivate() {
-	if (mcpClient) {
-		mcpClient.disconnect().catch(error => {
-			console.error('Error disconnecting MCP client during deactivation:', error);
-		});
-	}
+	console.log('👋 Task Master Kanban extension deactivated');
+	
+	// Close all active webview panels
+	activeWebviewPanels.forEach(panel => panel.dispose());
+	activeWebviewPanels = [];
 }

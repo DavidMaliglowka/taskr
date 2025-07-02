@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useReducer, useContext, createContext } from 'react';
+import React, { useState, useEffect, useReducer, useContext, createContext, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 
-// Import the shadcn Kanban components
-import {
-  KanbanProvider,
-  KanbanBoard,
-  KanbanHeader,
-  KanbanCards,
+// Import shadcn Kanban components
+import { 
+  KanbanProvider, 
+  KanbanBoard, 
+  KanbanHeader, 
+  KanbanCards, 
   KanbanCard,
   type DragEndEvent,
   type Status,
@@ -26,15 +26,11 @@ interface TaskMasterTask {
   subtasks?: TaskMasterTask[];
 }
 
-interface MCPStatus {
-  isRunning: boolean;
-  pid?: number;
-  error?: string;
-}
-
 interface WebviewMessage {
   type: string;
   requestId?: string;
+  data?: any;
+  success?: boolean;
   [key: string]: any;
 }
 
@@ -52,90 +48,21 @@ declare global {
 // State management types
 interface AppState {
   tasks: TaskMasterTask[];
-  mcpStatus: MCPStatus;
   loading: boolean;
   error?: string;
   requestId: number;
-  retryCount: number;
+  isConnected: boolean;
+  connectionStatus: string;
 }
 
 type AppAction =
   | { type: 'SET_TASKS'; payload: TaskMasterTask[] }
-  | { type: 'SET_MCP_STATUS'; payload: MCPStatus }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string }
+  | { type: 'CLEAR_ERROR' }
   | { type: 'INCREMENT_REQUEST_ID' }
-  | { type: 'INCREMENT_RETRIES' }
-  | { type: 'RESET_RETRIES' }
-  | { type: 'UPDATE_TASK_STATUS'; payload: { taskId: string; newStatus: TaskMasterTask['status'] } };
-
-// Sample Task Master data for demonstration
-const sampleTasks: TaskMasterTask[] = [
-  {
-    id: '1',
-    title: 'Set up VS Code Extension',
-    description: 'Initialize the VS Code extension with proper manifest and entry point',
-    status: 'done',
-    priority: 'high',
-    details: 'Extension manifest configured with webview capabilities and commands',
-  },
-  {
-    id: '2',
-    title: 'Create MCP Client',
-    description: 'Implement MCP client for Task Master integration',
-    status: 'done',
-    priority: 'high',
-    dependencies: ['1'],
-  },
-  {
-    id: '3',
-    title: 'Build React Webview',
-    description: 'Set up React environment within VS Code webview context',
-    status: 'done',
-    priority: 'high',
-    dependencies: ['1'],
-  },
-  {
-    id: '4',
-    title: 'Integrate shadcn/ui Components',
-    description: 'Add shadcn/ui components and configure Tailwind CSS',
-    status: 'in-progress',
-    priority: 'high',
-    dependencies: ['3'],
-  },
-  {
-    id: '5',
-    title: 'Implement Kanban Board',
-    description: 'Create interactive Kanban board with drag-and-drop functionality',
-    status: 'in-progress',
-    priority: 'high',
-    dependencies: ['4'],
-  },
-  {
-    id: '6',
-    title: 'Add Task Filtering',
-    description: 'Implement filtering by status, priority, and tags',
-    status: 'pending',
-    priority: 'medium',
-    dependencies: ['5'],
-  },
-  {
-    id: '7',
-    title: 'Create Task Details Panel',
-    description: 'Build detailed task view with edit capabilities',
-    status: 'pending',
-    priority: 'medium',
-    dependencies: ['5'],
-  },
-  {
-    id: '8',
-    title: 'Implement Task Analytics',
-    description: 'Add progress tracking and performance metrics',
-    status: 'pending',
-    priority: 'low',
-    dependencies: ['6', '7'],
-  },
-];
+  | { type: 'UPDATE_TASK_STATUS'; payload: { taskId: string; newStatus: TaskMasterTask['status'] } }
+  | { type: 'SET_CONNECTION_STATUS'; payload: { isConnected: boolean; status: string } };
 
 // Kanban column configuration
 const kanbanStatuses: Status[] = [
@@ -151,18 +78,14 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
   switch (action.type) {
     case 'SET_TASKS':
       return { ...state, tasks: action.payload, loading: false, error: undefined };
-    case 'SET_MCP_STATUS':
-      return { ...state, mcpStatus: action.payload };
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false };
+    case 'CLEAR_ERROR':
+      return { ...state, error: undefined };
     case 'INCREMENT_REQUEST_ID':
       return { ...state, requestId: state.requestId + 1 };
-    case 'INCREMENT_RETRIES':
-      return { ...state, retryCount: state.retryCount + 1 };
-    case 'RESET_RETRIES':
-      return { ...state, retryCount: 0 };
     case 'UPDATE_TASK_STATUS':
       const updatedTasks = state.tasks.map(task =>
         task.id === action.payload.taskId
@@ -170,6 +93,12 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
           : task
       );
       return { ...state, tasks: updatedTasks };
+    case 'SET_CONNECTION_STATUS':
+      return { 
+        ...state, 
+        isConnected: action.payload.isConnected,
+        connectionStatus: action.payload.status
+      };
     default:
       return state;
   }
@@ -180,6 +109,8 @@ const VSCodeContext = createContext<{
   vscode?: ReturnType<NonNullable<typeof window.acquireVsCodeApi>>;
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
+  sendMessage: (message: WebviewMessage) => Promise<any>;
+  availableHeight: number;
 } | null>(null);
 
 // Error Boundary Component
@@ -229,25 +160,18 @@ const PriorityBadge: React.FC<{ priority: TaskMasterTask['priority'] }> = ({ pri
     low: 'bg-green-500/20 text-green-400 border-green-500/30',
   };
 
-  const priorityShort = {
-    high: 'H',
-    medium: 'M', 
-    low: 'L'
-  };
-
   return (
     <span 
       className={`
         inline-flex items-center justify-center
-        px-1.5 py-0.5 sm:px-2 
+        px-2 py-0.5
         rounded text-xs font-medium border 
-        min-w-[20px] sm:min-w-[24px]
+        min-w-[50px]
         ${colorMap[priority]}
       `}
       title={priority}
     >
-      <span className="block sm:hidden">{priorityShort[priority]}</span>
-      <span className="hidden sm:block">{priority}</span>
+      {priority}
     </span>
   );
 };
@@ -265,17 +189,21 @@ const TaskCard: React.FC<{
       index={index} 
       parent={status}
       className="
-        p-2 sm:p-3 
-        min-h-[80px] sm:min-h-[100px]
+        kanban-card
+        p-3 w-full
+        min-h-[120px]
         touch-manipulation
-        hover:shadow-lg transition-shadow duration-200
         cursor-grab active:cursor-grabbing
         select-none
+        border border-vscode-border/50
+        bg-vscode-input/80 hover:bg-vscode-input
+        rounded-md
+        flex-shrink-0
       "
     >
-      <div className="space-y-1 sm:space-y-2">
-        <div className="flex items-start justify-between gap-1">
-          <h3 className="font-medium text-xs sm:text-sm leading-tight flex-1 min-w-0">
+      <div className="space-y-3 h-full flex flex-col">
+        <div className="flex items-start justify-between gap-2 flex-shrink-0">
+          <h3 className="font-medium text-sm leading-tight flex-1 min-w-0 text-vscode-foreground">
             {task.title}
           </h3>
           <div className="flex-shrink-0">
@@ -284,17 +212,17 @@ const TaskCard: React.FC<{
         </div>
         
         {task.description && (
-          <p className="text-xs text-vscode-foreground/70 line-clamp-2 leading-relaxed">
+          <p className="text-xs text-vscode-foreground/70 line-clamp-3 leading-relaxed flex-1 min-h-0">
             {task.description}
           </p>
         )}
         
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-mono text-vscode-foreground/50 truncate">
+        <div className="flex items-center justify-between text-xs mt-auto pt-2 flex-shrink-0 border-t border-vscode-border/20">
+          <span className="font-mono text-vscode-foreground/50 flex-shrink-0">
             #{task.id}
           </span>
           {task.dependencies && task.dependencies.length > 0 && (
-            <span className="text-vscode-foreground/50 flex-shrink-0 ml-1">
+            <span className="text-vscode-foreground/50 flex-shrink-0 ml-2">
               Deps: {task.dependencies.length}
             </span>
           )}
@@ -309,8 +237,12 @@ const TaskMasterKanban: React.FC = () => {
   const context = useContext(VSCodeContext);
   if (!context) throw new Error('TaskMasterKanban must be used within VSCodeContext');
 
-  const { state, dispatch } = context;
+  const { state, dispatch, sendMessage, availableHeight } = context;
   const { tasks, loading, error } = state;
+
+  // Calculate header height for proper kanban board sizing
+  const headerHeight = 73; // Header with padding and border
+  const kanbanHeight = availableHeight - headerHeight;
 
   // Group tasks by status
   const tasksByStatus = kanbanStatuses.reduce((acc, status) => {
@@ -319,7 +251,7 @@ const TaskMasterKanban: React.FC = () => {
   }, {} as Record<string, TaskMasterTask[]>);
 
   // Handle drag end
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
     if (!over) return;
@@ -327,19 +259,48 @@ const TaskMasterKanban: React.FC = () => {
     const taskId = active.id as string;
     const newStatus = over.id as TaskMasterTask['status'];
     
-    // Update task status locally
+    // Find the task that was moved
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === newStatus) return;
+
+    console.log(`🔄 Moving task ${taskId} from ${task.status} to ${newStatus}`);
+    
+    // Update task status locally (optimistic update)
     dispatch({
       type: 'UPDATE_TASK_STATUS',
       payload: { taskId, newStatus }
     });
 
-    // TODO: Send update to MCP server
-    console.log(`Moving task ${taskId} to ${newStatus}`);
+    try {
+      // Send update to extension
+      await sendMessage({
+        type: 'updateTaskStatus',
+        data: { taskId, newStatus, oldStatus: task.status }
+      });
+      
+      console.log(`✅ Task ${taskId} status updated successfully`);
+    } catch (error) {
+      console.error(`❌ Failed to update task ${taskId}:`, error);
+      
+      // Revert the optimistic update on error
+      dispatch({
+        type: 'UPDATE_TASK_STATUS',
+        payload: { taskId, newStatus: task.status }
+      });
+      
+      dispatch({
+        type: 'SET_ERROR',
+        payload: `Failed to update task status: ${error}`
+      });
+    }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div 
+        className="flex items-center justify-center" 
+        style={{ height: `${kanbanHeight}px` }}
+      >
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vscode-foreground mx-auto mb-4"></div>
           <p className="text-sm text-vscode-foreground/70">Loading tasks...</p>
@@ -350,52 +311,101 @@ const TaskMasterKanban: React.FC = () => {
 
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 m-4">
         <p className="text-red-400 text-sm">Error: {error}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full">
-      <KanbanProvider 
-        onDragEnd={handleDragEnd} 
-        className="
-          h-full 
-          grid w-full gap-2 overflow-x-auto
-          grid-cols-5
-          lg:grid-cols-5
-          md:grid-cols-3
-          sm:grid-cols-2
-          xs:grid-cols-1
-        "
+    <div 
+      className="flex flex-col"
+      style={{ height: `${availableHeight}px` }}
+    >
+      <div className="flex-shrink-0 p-4 bg-vscode-sidebar-background border-b border-vscode-border">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-vscode-foreground">Task Master Kanban</h1>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${state.isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+            <span className="text-xs text-vscode-foreground/70">
+              {state.connectionStatus}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div 
+        className="flex-1 px-4 py-4 overflow-hidden"
+        style={{ height: `${kanbanHeight}px` }}
       >
-        {kanbanStatuses.map(status => (
-          <KanbanBoard 
-            key={status.id} 
-            id={status.id} 
-            className="
-              min-h-[50vh] min-w-[250px] max-w-[400px]
-              lg:min-h-[60vh] lg:min-w-[280px]
-              md:min-h-[55vh] md:min-w-[260px]
-              sm:min-h-[50vh] sm:min-w-[240px]
-              xs:min-h-[40vh] xs:min-w-[220px]
-            "
-          >
-            <KanbanHeader name={status.name} color={status.color} className="px-2 py-1 text-xs sm:text-sm" />
-            <KanbanCards className="gap-1 sm:gap-2">
-              {tasksByStatus[status.id]?.map((task, index) => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  index={index} 
-                  status={status.id}
-                />
-              ))}
-            </KanbanCards>
-          </KanbanBoard>
-        ))}
-      </KanbanProvider>
+        <KanbanProvider 
+          onDragEnd={handleDragEnd} 
+          className="
+            kanban-container
+            w-full h-full
+            overflow-x-auto overflow-y-hidden
+          "
+        >
+          <div className="
+            flex gap-4 
+            min-w-max
+            h-full
+            pb-2
+          ">
+            {kanbanStatuses.map(status => {
+              const columnHeaderHeight = 49; // Header with padding and border
+              const columnPadding = 16; // p-2 = 8px top + 8px bottom
+              const availableColumnHeight = kanbanHeight - columnHeaderHeight - columnPadding;
+              
+              return (
+                <KanbanBoard 
+                  key={status.id} 
+                  id={status.id} 
+                  className="
+                    kanban-column
+                    flex-shrink-0
+                    min-w-[280px] max-w-[320px] w-[280px]
+                    h-full
+                    flex flex-col
+                    border border-vscode-border/30
+                    rounded-lg
+                    bg-vscode-sidebar-background/50
+                  "
+                >
+                  <KanbanHeader 
+                    name={`${status.name} (${tasksByStatus[status.id]?.length || 0})`} 
+                    color={status.color} 
+                    className="px-3 py-3 text-sm font-medium flex-shrink-0 border-b border-vscode-border/30" 
+                  />
+                  <div
+                    className="
+                      flex flex-col gap-2 
+                      overflow-y-auto overflow-x-hidden
+                      p-2
+                      scrollbar-thin scrollbar-track-transparent
+                    "
+                    style={{ 
+                      height: `${availableColumnHeight}px`,
+                      maxHeight: `${availableColumnHeight}px`
+                    }}
+                  >
+                    <KanbanCards className="flex flex-col gap-2">
+                      {tasksByStatus[status.id]?.map((task, index) => (
+                        <TaskCard 
+                          key={task.id} 
+                          task={task} 
+                          index={index} 
+                          status={status.id}
+                        />
+                      ))}
+                    </KanbanCards>
+                  </div>
+                </KanbanBoard>
+              );
+            })}
+          </div>
+        </KanbanProvider>
+      </div>
     </div>
   );
 };
@@ -403,114 +413,183 @@ const TaskMasterKanban: React.FC = () => {
 // Main App Component
 const App: React.FC = () => {
   const [state, dispatch] = useReducer(appReducer, {
-    tasks: sampleTasks,
-    mcpStatus: { isRunning: false },
-    loading: false,
+    tasks: [],
+    loading: true,
     requestId: 0,
-    retryCount: 0,
+    isConnected: false,
+    connectionStatus: 'Connecting...'
   });
 
   const [vscode] = useState(() => {
-    try {
-      return window.acquireVsCodeApi?.();
-    } catch (error) {
-      console.warn('VS Code API not available:', error);
-      return undefined;
-    }
+    return window.acquireVsCodeApi?.();
   });
 
+  const [pendingRequests] = useState(new Map<string, { resolve: Function; reject: Function; timeout: NodeJS.Timeout }>());
+
+  // Dynamic height calculation state
+  const [availableHeight, setAvailableHeight] = useState<number>(window.innerHeight);
+
+  // Calculate available height for kanban board
+  const updateAvailableHeight = useCallback(() => {
+    // Use window.innerHeight to get the actual available space
+    // This automatically accounts for VS Code panels like terminal, problems, etc.
+    const height = window.innerHeight;
+    console.log('📏 Available height updated:', height);
+    setAvailableHeight(height);
+  }, []);
+
+  // Listen to resize events to handle VS Code panel changes
+  useEffect(() => {
+    updateAvailableHeight();
+    
+    const handleResize = () => {
+      updateAvailableHeight();
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    // Also listen for VS Code specific events if available
+    const handleVisibilityChange = () => {
+      // Small delay to ensure VS Code has finished resizing
+      setTimeout(updateAvailableHeight, 100);
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [updateAvailableHeight]);
+
+  // Send message to extension with promise-based response handling
+  const sendMessage = useCallback(async (message: WebviewMessage): Promise<any> => {
+    if (!vscode) {
+      throw new Error('VS Code API not available');
+    }
+
+    return new Promise((resolve, reject) => {
+      const requestId = `${Date.now()}-${Math.random()}`;
+      const messageWithId = { ...message, requestId };
+
+      // Set up timeout
+      const timeout = setTimeout(() => {
+        pendingRequests.delete(requestId);
+        reject(new Error('Request timeout'));
+      }, 10000); // 10 second timeout
+
+      // Store the promise resolvers
+      pendingRequests.set(requestId, { resolve, reject, timeout });
+
+      // Send the message
+      vscode.postMessage(messageWithId);
+    });
+  }, [vscode, pendingRequests]);
+
+  // Handle messages from extension
   useEffect(() => {
     if (!vscode) return;
 
-    const handleMessage = (event: MessageEvent<WebviewMessage>) => {
-      const message = event.data;
-      console.log('Received message from extension:', message);
+    const handleMessage = (event: MessageEvent) => {
+      const message: WebviewMessage = event.data;
+      console.log('📨 Received message from extension:', message);
 
+      // Handle response to a pending request
+      if (message.requestId && pendingRequests.has(message.requestId)) {
+        const { resolve, reject, timeout } = pendingRequests.get(message.requestId)!;
+        clearTimeout(timeout);
+        pendingRequests.delete(message.requestId);
+
+        if (message.type === 'error') {
+          reject(new Error(message.error || 'Unknown error'));
+        } else {
+          resolve(message.data || message);
+        }
+        return;
+      }
+
+      // Handle different message types
       switch (message.type) {
-        case 'mcpStatusResponse':
-          dispatch({ type: 'SET_MCP_STATUS', payload: message.status });
+        case 'init':
+          console.log('🚀 Extension initialized:', message.data);
+          dispatch({
+            type: 'SET_CONNECTION_STATUS',
+            payload: { isConnected: true, status: 'Connected' }
+          });
           break;
-        case 'mcpCallResponse':
-          if (message.result?.tasks) {
-            dispatch({ type: 'SET_TASKS', payload: message.result.tasks });
-          }
+
+        case 'tasksData':
+          console.log('📋 Received tasks data:', message.data);
+          dispatch({ type: 'SET_TASKS', payload: message.data });
           break;
-        case 'error':
-          dispatch({ type: 'SET_ERROR', payload: message.error });
+
+        case 'taskStatusUpdated':
+          console.log('✅ Task status updated:', message);
+          // Status is already updated optimistically, no need to update again
           break;
+
+        default:
+          console.log('❓ Unknown message type:', message.type);
       }
     };
 
     window.addEventListener('message', handleMessage);
-    
-    // Request initial MCP status
-    vscode.postMessage({ type: 'getMcpStatus' });
+    return () => window.removeEventListener('message', handleMessage);
+  }, [vscode, pendingRequests]);
 
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [vscode]);
+  // Initialize the webview
+  useEffect(() => {
+    if (!vscode) {
+      console.warn('⚠️ VS Code API not available - running in standalone mode');
+      dispatch({
+        type: 'SET_CONNECTION_STATUS',
+        payload: { isConnected: false, status: 'Standalone Mode' }
+      });
+      return;
+    }
+
+    console.log('🔄 Initializing webview...');
+    
+    // Notify extension that webview is ready
+    vscode.postMessage({ type: 'ready' });
+
+    // Request initial tasks data
+    sendMessage({ type: 'getTasks' })
+      .then((tasksData) => {
+        console.log('📋 Initial tasks loaded:', tasksData);
+        dispatch({ type: 'SET_TASKS', payload: tasksData });
+      })
+      .catch((error) => {
+        console.error('❌ Failed to load initial tasks:', error);
+        dispatch({ type: 'SET_ERROR', payload: `Failed to load tasks: ${error.message}` });
+      });
+
+  }, [vscode, sendMessage]);
+
+  const contextValue = {
+    vscode,
+    state,
+    dispatch,
+    sendMessage,
+    availableHeight
+  };
 
   return (
-    <VSCodeContext.Provider value={{ vscode, state, dispatch }}>
-      <div className="min-h-screen bg-vscode-background text-vscode-foreground">
-        <div className="h-screen flex flex-col">
-          {/* Header */}
-          <div className="border-b border-vscode-border p-2 sm:p-3 lg:p-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-xl font-bold truncate">
-                  🎯 Task Master Kanban
-                </h1>
-                <p className="text-xs sm:text-sm text-vscode-foreground/70 hidden sm:block">
-                  Visual task management for your projects
-                </p>
-              </div>
-              <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                <div className={`h-2 w-2 rounded-full ${state.mcpStatus.isRunning ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                <span className="text-xs text-vscode-foreground/70 hidden sm:inline">
-                  MCP {state.mcpStatus.isRunning ? 'Connected' : 'Disconnected'}
-                </span>
-                <span className="text-xs text-vscode-foreground/70 sm:hidden">
-                  {state.mcpStatus.isRunning ? '●' : '○'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Kanban Board */}
-          <div className="flex-1 p-1 sm:p-2 lg:p-4 overflow-hidden">
-            <TaskMasterKanban />
-          </div>
-
-          {/* Footer */}
-          <div className="border-t border-vscode-border p-1 sm:p-2 text-center flex-shrink-0">
-            <p className="text-xs text-vscode-foreground/50">
-              <span className="hidden sm:inline">
-                Total Tasks: {state.tasks.length} | 
-                Completed: {state.tasks.filter(t => t.status === 'done').length} |
-                In Progress: {state.tasks.filter(t => t.status === 'in-progress').length}
-              </span>
-              <span className="sm:hidden">
-                {state.tasks.length} tasks ({state.tasks.filter(t => t.status === 'done').length} done)
-              </span>
-            </p>
-          </div>
+    <ErrorBoundary>
+      <VSCodeContext.Provider value={contextValue}>
+        <div className="h-full w-full bg-vscode-background text-vscode-foreground flex flex-col">
+          <TaskMasterKanban />
         </div>
-      </div>
-    </VSCodeContext.Provider>
+      </VSCodeContext.Provider>
+    </ErrorBoundary>
   );
 };
 
-// Bootstrap the React application
+// Initialize React app
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
-  root.render(
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  );
+  root.render(<App />);
 } else {
-  console.error('Root container not found');
+  console.error('❌ Root container not found');
 } 

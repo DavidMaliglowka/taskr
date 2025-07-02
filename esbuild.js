@@ -84,13 +84,21 @@ async function main() {
 	const webviewCtx = await esbuild.context({
 		entryPoints: ['src/webview/index.tsx'],
 		bundle: true,
-		format: 'esm',
+		format: 'iife',
+		globalName: 'App',
 		minify: production,
 		sourcemap: !production,
 		sourcesContent: false,
 		platform: 'browser',
 		outdir: 'dist',
 		logLevel: 'silent',
+		target: ['es2020'],
+		jsx: 'automatic',
+		jsxImportSource: 'react',
+		define: {
+			'process.env.NODE_ENV': production ? '"production"' : '"development"',
+			'global': 'globalThis'
+		},
 		plugins: [
 			esbuildProblemMatcherPlugin,
 			aliasPlugin,
