@@ -78,6 +78,7 @@ let pollingState: PollingState = {
 async function initializeMCPComponents(context: vscode.ExtensionContext) {
 	try {
 		console.log('🔄 Initializing MCP components...');
+		console.log('🔍 DEBUGGING: initializeMCPComponents started at', new Date().toISOString());
 		
 		// Initialize ConfigManager singleton
 		configManager = ConfigManager.getInstance();
@@ -86,9 +87,10 @@ async function initializeMCPComponents(context: vscode.ExtensionContext) {
 		const mcpConfig = createMCPConfigFromSettings();
 		
 		// Initialize MCP client
+		console.log('🔍 DEBUGGING: About to create MCPClientManager with config:', mcpConfig);
 		mcpClient = new MCPClientManager(mcpConfig);
 		
-		// Initialize TaskMaster API
+		// Initialize TaskMaster API first (even without connection)
 		taskMasterApi = new TaskMasterApi(mcpClient, {
 			timeout: 30000,
 			retryAttempts: 3,
@@ -96,12 +98,47 @@ async function initializeMCPComponents(context: vscode.ExtensionContext) {
 			projectRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 		});
 		
-		// Test connection
-		const connectionTest = await taskMasterApi.testConnection();
-		if (connectionTest.success) {
-			console.log('✅ Task Master MCP connection established');
-		} else {
-			console.warn('⚠️ Task Master MCP connection failed:', connectionTest.error);
+		// Try to connect to MCP server
+		console.log('🔗 Connecting to Task Master MCP server...');
+		try {
+			await mcpClient.connect();
+			
+			// Test connection
+			const connectionTest = await taskMasterApi.testConnection();
+			if (connectionTest.success && connectionTest.data) {
+				console.log('✅ Task Master MCP connection established');
+				vscode.window.showInformationMessage('Task Master connected successfully!');
+			} else {
+				throw new Error(connectionTest.error || 'Connection test failed');
+			}
+		} catch (connectionError) {
+			console.error('❌ Task Master MCP connection failed:', connectionError);
+			console.error('Connection error details:', { 
+				message: connectionError instanceof Error ? connectionError.message : 'Unknown error',
+				stack: connectionError instanceof Error ? connectionError.stack : undefined,
+				code: (connectionError as any)?.code,
+				errno: (connectionError as any)?.errno,
+				syscall: (connectionError as any)?.syscall
+			});
+			const errorMessage = connectionError instanceof Error ? connectionError.message : 'Unknown connection error';
+			
+			if (errorMessage.includes('ENOENT') && errorMessage.includes('npx')) {
+				vscode.window.showWarningMessage(
+					'Task Master: npx not found. Please ensure Node.js is installed and accessible to VS Code. ' +
+					'You may need to restart VS Code after installing Node.js.',
+					'Open Settings'
+				).then((action) => {
+					if (action === 'Open Settings') {
+						vscode.commands.executeCommand('workbench.action.openSettings', '@ext:taskr taskmaster');
+					}
+				});
+			} else {
+				vscode.window.showWarningMessage(`Task Master connection failed: ${errorMessage}`);
+			}
+			
+			// Initialize in offline mode
+			pollingState.isOfflineMode = true;
+			console.log('📴 Starting in offline mode - some features will be unavailable');
 		}
 		
 	} catch (error) {
@@ -450,6 +487,7 @@ async function handleUIError(error: Error | unknown, operation: string, context?
 export function activate(context: vscode.ExtensionContext) {
 	console.log('🎉 Task Master Kanban extension is now active!');
 	console.log('🎉 Extension context:', context);
+	console.log('🔍 DEBUGGING: Extension activation started at', new Date().toISOString());
 	
 	// Initialize error handler
 	errorHandler = getErrorHandler();
@@ -542,33 +580,45 @@ export function activate(context: vscode.ExtensionContext) {
 					case 'getTasks':
 						console.log('📋 Getting tasks...');
 						try {
-							if (taskMasterApi) {
-								const tasksResult = await taskMasterApi.getTasks({
-									withSubtasks: true,
-									projectRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+							if (!taskMasterApi) {
+								throw new Error('Task Master API not initialized - extension may be starting up');
+							}
+							
+							// Check if we're in offline mode
+							if (pollingState.isOfflineMode) {
+								throw new Error('Task Master is in offline mode - MCP server connection failed');
+							}
+							
+							const tasksResult = await taskMasterApi.getTasks({
+								withSubtasks: true,
+								projectRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+							});
+							
+							if (tasksResult.success) {
+								panel.webview.postMessage({
+									type: 'tasksData',
+									requestId: message.requestId,
+									data: tasksResult.data
 								});
-								
-								if (tasksResult.success) {
-									panel.webview.postMessage({
-										type: 'tasksData',
-										requestId: message.requestId,
-										data: tasksResult.data
-									});
-									console.log(`✅ Retrieved ${tasksResult.data?.length || 0} tasks from Task Master`);
-								} else {
-									throw new Error(tasksResult.error || 'Failed to get tasks');
-								}
+								console.log(`✅ Retrieved ${tasksResult.data?.length || 0} tasks from Task Master`);
 							} else {
-								throw new Error('Task Master API not initialized');
+								throw new Error(tasksResult.error || 'Failed to get tasks');
 							}
 						} catch (error) {
 							console.error('❌ Error getting tasks:', error);
-							// Fallback to sample data if MCP fails
+							
+							// Send error to webview instead of falling back to sample data
 							panel.webview.postMessage({
-								type: 'tasksData',
+								type: 'error',
 								requestId: message.requestId,
-								data: getSampleTasks()
+								error: error instanceof Error ? error.message : 'Failed to get tasks',
+								errorType: 'connection'
 							});
+							
+							// Enter offline mode if this is a connection error
+							if (!pollingState.isOfflineMode) {
+								handleNetworkError(error);
+							}
 						}
 						break;
 						

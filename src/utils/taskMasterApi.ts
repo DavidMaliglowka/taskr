@@ -629,7 +629,28 @@ export class TaskMasterApi {
 
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
       try {
-        return await this.mcpClient.callTool(toolName, args);
+        const rawResponse = await this.mcpClient.callTool(toolName, args);
+        console.log(`🔍 DEBUGGING: Raw MCP response for ${toolName}:`, JSON.stringify(rawResponse, null, 2));
+        
+        // Parse MCP response format: { content: [{ type: 'text', text: '{"data": {...}}' }] }
+        if (rawResponse && rawResponse.content && Array.isArray(rawResponse.content) && rawResponse.content[0]) {
+          const contentItem = rawResponse.content[0];
+          if (contentItem.type === 'text' && contentItem.text) {
+            try {
+              const parsedData = JSON.parse(contentItem.text);
+              console.log(`🔍 DEBUGGING: Parsed MCP data for ${toolName}:`, parsedData);
+              return parsedData;
+            } catch (parseError) {
+              console.error(`TaskMasterApi: Failed to parse MCP response text for ${toolName}:`, parseError);
+              console.error(`TaskMasterApi: Raw text was:`, contentItem.text);
+              return rawResponse; // Fall back to original response
+            }
+          }
+        }
+        
+        // If not in expected format, return as-is
+        console.warn(`TaskMasterApi: Unexpected MCP response format for ${toolName}, returning raw response`);
+        return rawResponse;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         console.warn(`TaskMasterApi: Attempt ${attempt}/${this.config.retryAttempts} failed for ${toolName}:`, lastError.message);

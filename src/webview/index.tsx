@@ -1278,6 +1278,39 @@ const App: React.FC = () => {
           });
           break;
 
+        case 'error':
+          console.log('❌ General error from extension:', message);
+          const errorTitle = message.errorType === 'connection' ? 'Connection Error' : 'Error';
+          const errorMessage = message.error || 'An unknown error occurred';
+          
+          dispatch({
+            type: 'SET_ERROR',
+            payload: errorMessage
+          });
+          
+          dispatch({
+            type: 'ADD_TOAST',
+            payload: createToast(
+              'error',
+              errorTitle,
+              errorMessage,
+              8000
+            )
+          });
+          
+          // Set offline mode for connection errors
+          if (message.errorType === 'connection') {
+            dispatch({
+              type: 'SET_NETWORK_STATUS',
+              payload: {
+                isOfflineMode: true,
+                connectionStatus: 'offline',
+                reconnectAttempts: 0
+              }
+            });
+          }
+          break;
+
         case 'reactError':
           console.log('🔥 React error reported to extension:', message);
           // Show a toast for React errors too

@@ -10,6 +10,7 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
+				"/Users/david/Developer/Gauntlet/taskr-test-website",
 				"--extensionDevelopmentPath=${workspaceFolder}"
 			],
 			"outFiles": [
