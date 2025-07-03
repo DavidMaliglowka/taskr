@@ -20,6 +20,7 @@ import {
 	createErrorContext 
 } from './utils/errorHandler';
 import { getToastDuration } from './utils/notificationPreferences';
+import { parseTaskFileData } from './utils/taskFileReader';
 
 // Global MCP client manager instance
 let mcpClient: MCPClientManager | null = null;
@@ -781,6 +782,67 @@ export function activate(context: vscode.ExtensionContext) {
 							);
 						} catch (error) {
 							console.error('Failed to handle React error:', error);
+						}
+						break;
+						
+					case 'readTaskFileData':
+						console.log('📄 Reading task file data:', message.data);
+						const { requestId } = message;
+						try {
+							const { taskId, tag: tagName = 'master' } = message.data;
+							
+							// Get workspace folder
+							const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+							if (!workspaceFolder) {
+								throw new Error('No workspace folder found');
+							}
+							
+							// Build path to tasks.json
+							const tasksJsonPath = path.join(workspaceFolder.uri.fsPath, '.taskmaster', 'tasks', 'tasks.json');
+							console.log('🔍 Looking for tasks.json at:', tasksJsonPath);
+							
+							// Check if file exists
+							if (!fs.existsSync(tasksJsonPath)) {
+								// Try legacy location
+								const legacyPath = path.join(workspaceFolder.uri.fsPath, 'tasks', 'tasks.json');
+								console.log('🔍 Trying legacy path:', legacyPath);
+								if (!fs.existsSync(legacyPath)) {
+									throw new Error('tasks.json not found in .taskmaster/tasks/ or tasks/ directory');
+								}
+								// Use legacy path
+								const content = fs.readFileSync(legacyPath, 'utf8');
+								console.log('📖 Read legacy tasks.json, content length:', content.length);
+								const taskData = parseTaskFileData(content, taskId, tagName);
+								console.log('✅ Parsed task data for legacy path:', taskData);
+								panel.webview.postMessage({
+									type: 'response',
+									requestId,
+									data: taskData
+								});
+								return;
+							}
+							
+							// Read and parse tasks.json
+							const content = fs.readFileSync(tasksJsonPath, 'utf8');
+							console.log('📖 Read tasks.json, content length:', content.length);
+							const taskData = parseTaskFileData(content, taskId, tagName);
+							console.log('✅ Parsed task data:', taskData);
+							
+							panel.webview.postMessage({
+								type: 'response',
+								requestId,
+								data: taskData
+							});
+							
+							console.log(`✅ Retrieved task file data for task ${taskId}`);
+							
+						} catch (error) {
+							console.error('❌ Error reading task file data:', error);
+							panel.webview.postMessage({
+								type: 'error',
+								requestId,
+								error: error instanceof Error ? error.message : 'Failed to read task file data'
+							});
 						}
 						break;
 						

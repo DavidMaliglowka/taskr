@@ -76,6 +76,12 @@ const StatusBadge: React.FC<{ status: TaskMasterTask['status'] }> = ({ status })
   );
 };
 
+// Define the TaskFileData interface here since we're no longer importing it
+interface TaskFileData {
+  details?: string;
+  testStrategy?: string;
+}
+
 export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   taskId,
   onNavigateBack,
@@ -101,6 +107,11 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   const [prompt, setPrompt] = useState('');
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isAppending, setIsAppending] = useState(false);
+  
+  // Task file data states (for implementation details and test strategy)
+  const [taskFileData, setTaskFileData] = useState<TaskFileData>({ details: undefined, testStrategy: undefined });
+  const [isLoadingTaskFileData, setIsLoadingTaskFileData] = useState(false);
+  const [taskFileDataError, setTaskFileDataError] = useState<string | null>(null);
 
   // Parse task ID to determine if it's a subtask (e.g., "13.2")
   const parseTaskId = (id: string) => {
@@ -119,6 +130,43 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     };
   };
 
+  // Fetch task file data (implementation details and test strategy)
+  const fetchTaskFileData = async (targetTaskId: string) => {
+    if (!targetTaskId) return;
+    
+    console.log('📄 TaskDetailsView: Fetching task file data for:', targetTaskId);
+    setIsLoadingTaskFileData(true);
+    setTaskFileDataError(null);
+    
+    try {
+      // Send message to extension to read task file data
+      console.log('📤 TaskDetailsView: Sending readTaskFileData message');
+      const response = await sendMessage({
+        type: 'readTaskFileData',
+        data: {
+          taskId: targetTaskId,
+          tag: 'master' // Default to master tag
+        }
+      });
+      
+      console.log('📨 TaskDetailsView: Received response:', response);
+      
+      // The response IS the data object with details and testStrategy
+      if (response && (response.details !== undefined || response.testStrategy !== undefined)) {
+        console.log('✅ TaskDetailsView: Setting task file data:', response);
+        setTaskFileData(response);
+      } else {
+        throw new Error('No task file data found in response');
+      }
+    } catch (error) {
+      console.error('❌ TaskDetailsView: Failed to fetch task file data:', error);
+      setTaskFileDataError(error instanceof Error ? error.message : 'Failed to load task details');
+      setTaskFileData({ details: undefined, testStrategy: undefined });
+    } finally {
+      setIsLoadingTaskFileData(false);
+    }
+  };
+
   // Find task or subtask by ID
   useEffect(() => {
     const { isSubtask: isSubtaskId, parentId, subtaskIndex } = parseTaskId(taskId);
@@ -133,6 +181,8 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
       if (parent && parent.subtasks && subtaskIndex >= 0 && subtaskIndex < parent.subtasks.length) {
         const subtask = parent.subtasks[subtaskIndex];
         setCurrentTask(subtask);
+        // Fetch file data for subtask
+        fetchTaskFileData(taskId);
       } else {
         setCurrentTask(null);
       }
@@ -141,8 +191,24 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
       const task = tasks.find(task => task.id === parentId);
       setCurrentTask(task || null);
       setParentTask(null);
+      // Fetch file data for main task
+      if (task) {
+        fetchTaskFileData(taskId);
+      }
     }
   }, [taskId, tasks]);
+
+  // Refresh task file data when tasks are updated from polling
+  useEffect(() => {
+    if (currentTask) {
+      // Small delay to ensure the tasks.json file has been updated
+      const timeoutId = setTimeout(() => {
+        fetchTaskFileData(taskId);
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentTask?.status, currentTask?.description, tasks.length]); // Re-fetch when task status or description changes
 
   // Handle AI Actions
   const handleRegenerate = async () => {
@@ -169,6 +235,12 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
           }
         });
       }
+      
+      // Refresh task file data after update
+      setTimeout(() => {
+        fetchTaskFileData(taskId);
+      }, 1000); // Wait 1 second for AI to finish processing
+      
     } catch (error) {
       console.error('❌ TaskDetailsView: Failed to regenerate task:', error);
     } finally {
@@ -201,6 +273,12 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
           }
         });
       }
+      
+      // Refresh task file data after update
+      setTimeout(() => {
+        fetchTaskFileData(taskId);
+      }, 1000); // Wait 1 second for AI to finish processing
+      
     } catch (error) {
       console.error('❌ TaskDetailsView: Failed to append to task:', error);
     } finally {
@@ -382,62 +460,94 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
           </div>
 
           {/* Implementation Details */}
-          {currentTask.details && (
-            <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
-                  onClick={() => setIsImplementationExpanded(!isImplementationExpanded)}
-                >
-                  {isImplementationExpanded ? (
-                    <ChevronDown className="w-4 h-4 mr-1" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 mr-1" />
-                  )}
-                  Implementation Details
-                </Button>
-              </div>
-
-              {isImplementationExpanded && (
-                <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
-                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
-                    {currentTask.details}
-                  </pre>
-                </div>
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
+                onClick={() => setIsImplementationExpanded(!isImplementationExpanded)}
+              >
+                {isImplementationExpanded ? (
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-1" />
+                )}
+                Implementation Details
+              </Button>
+              {isLoadingTaskFileData && (
+                <Loader2 className="w-4 h-4 animate-spin text-vscode-foreground/50" />
               )}
             </div>
-          )}
+
+            {isImplementationExpanded && (
+              <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
+                {isLoadingTaskFileData ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-vscode-foreground/50" />
+                    <span className="ml-2 text-sm text-vscode-foreground/70">Loading details...</span>
+                  </div>
+                ) : taskFileDataError ? (
+                  <div className="text-sm text-red-400 py-2">
+                    Error loading details: {taskFileDataError}
+                  </div>
+                ) : taskFileData.details ? (
+                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
+                    {taskFileData.details}
+                  </pre>
+                ) : (
+                  <div className="text-sm text-vscode-foreground/50 py-2">
+                    No implementation details available
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Test Strategy */}
-          {currentTask.testStrategy && (
-            <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
-                  onClick={() => setIsTestStrategyExpanded(!isTestStrategyExpanded)}
-                >
-                  {isTestStrategyExpanded ? (
-                    <ChevronDown className="w-4 h-4 mr-1" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 mr-1" />
-                  )}
-                  Test Strategy
-                </Button>
-              </div>
-
-              {isTestStrategyExpanded && (
-                <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
-                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
-                    {currentTask.testStrategy}
-                  </pre>
-                </div>
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
+                onClick={() => setIsTestStrategyExpanded(!isTestStrategyExpanded)}
+              >
+                {isTestStrategyExpanded ? (
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-1" />
+                )}
+                Test Strategy
+              </Button>
+              {isLoadingTaskFileData && (
+                <Loader2 className="w-4 h-4 animate-spin text-vscode-foreground/50" />
               )}
             </div>
-          )}
+
+            {isTestStrategyExpanded && (
+              <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
+                {isLoadingTaskFileData ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-vscode-foreground/50" />
+                    <span className="ml-2 text-sm text-vscode-foreground/70">Loading strategy...</span>
+                  </div>
+                ) : taskFileDataError ? (
+                  <div className="text-sm text-red-400 py-2">
+                    Error loading strategy: {taskFileDataError}
+                  </div>
+                ) : taskFileData.testStrategy ? (
+                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
+                    {taskFileData.testStrategy}
+                  </pre>
+                ) : (
+                  <div className="text-sm text-vscode-foreground/50 py-2">
+                    No test strategy available
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Subtasks section */}
           {currentTask.subtasks && currentTask.subtasks.length > 0 && (
