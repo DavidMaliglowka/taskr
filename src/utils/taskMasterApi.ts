@@ -13,6 +13,7 @@ export interface MCPTaskResponse {
       details?: string;
       testStrategy?: string;
       dependencies?: Array<number | string>;
+      complexityScore?: number;
       subtasks?: Array<{
         id: number;
         title: string;
@@ -44,6 +45,7 @@ export interface TaskMasterTask {
   details?: string;
   testStrategy?: string;
   dependencies?: string[];
+  complexityScore?: number;
   subtasks?: Array<{
     id: number;
     title: string;
@@ -780,6 +782,9 @@ export class TaskMasterApi {
       const details = this.validateAndNormalizeString(task.details, undefined, `details for task ${taskId}`);
       const testStrategy = this.validateAndNormalizeString(task.testStrategy, undefined, `testStrategy for task ${taskId}`);
       
+      // Handle complexity score
+      const complexityScore = typeof task.complexityScore === 'number' ? task.complexityScore : undefined;
+      
       // Transform dependencies
       const dependencies = this.transformDependencies(task.dependencies, taskId);
       
@@ -794,17 +799,19 @@ export class TaskMasterApi {
         priority,
         details,
         testStrategy,
+        complexityScore,
         dependencies,
         subtasks
       };
 
       // Log successful transformation for complex tasks
-      if (subtasks.length > 0 || dependencies.length > 0) {
+      if (subtasks.length > 0 || dependencies.length > 0 || complexityScore !== undefined) {
         console.log(`TaskMasterApi: Successfully transformed complex task ${taskId}:`, {
           subtaskCount: subtasks.length,
           dependencyCount: dependencies.length,
           status,
-          priority
+          priority,
+          complexityScore
         });
       }
 

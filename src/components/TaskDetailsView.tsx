@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { VSCodeContext, TaskMasterTask } from '../webview/index';
 import {
   Breadcrumb,
@@ -123,6 +123,67 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   const [isLoadingTaskFileData, setIsLoadingTaskFileData] = useState(false);
   const [taskFileDataError, setTaskFileDataError] = useState<string | null>(null);
 
+  // Get complexity score from main task data immediately (no flash)
+  const currentComplexityScore = currentTask?.complexityScore;
+  
+  // State for complexity data from MCP (only used for updates)
+  const [mcpComplexityScore, setMcpComplexityScore] = useState<number | undefined>(undefined);
+  const [isLoadingComplexity, setIsLoadingComplexity] = useState(false);
+  
+  // Use MCP complexity if available, otherwise use main task data
+  const displayComplexityScore = mcpComplexityScore !== undefined ? mcpComplexityScore : currentComplexityScore;
+
+  // Fetch complexity from MCP when needed
+  const fetchComplexityFromMCP = useCallback(async (force = false) => {
+    if (!currentTask || (!force && currentComplexityScore !== undefined)) {
+      return; // Don't fetch if we already have a score unless forced
+    }
+    
+    setIsLoadingComplexity(true);
+    try {
+      const complexityResult = await sendMessage({
+        type: 'mcpRequest',
+        tool: 'complexity_report',
+        params: {}
+      });
+      
+      if (complexityResult?.data?.report?.complexityAnalysis) {
+        const taskComplexity = complexityResult.data.report.complexityAnalysis.find(
+          (analysis: any) => analysis.taskId === currentTask.id
+        );
+        
+        if (taskComplexity?.complexityScore !== undefined) {
+          setMcpComplexityScore(taskComplexity.complexityScore);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch complexity from MCP:', error);
+    } finally {
+      setIsLoadingComplexity(false);
+    }
+  }, [currentTask, currentComplexityScore, sendMessage]);
+
+  // Refresh complexity after AI operations or when task changes
+  useEffect(() => {
+    if (currentTask) {
+      // Reset MCP complexity when task changes
+      setMcpComplexityScore(undefined);
+      
+      // Fetch from MCP if no complexity score in main data
+      if (currentComplexityScore === undefined) {
+        fetchComplexityFromMCP();
+      }
+    }
+  }, [currentTask?.id, currentComplexityScore, fetchComplexityFromMCP]);
+
+  // Refresh complexity after AI operations
+  const refreshComplexityAfterAI = useCallback(() => {
+    // Force refresh complexity after AI operations
+    setTimeout(() => {
+      fetchComplexityFromMCP(true);
+    }, 2000); // Wait for AI operation to complete
+  }, [fetchComplexityFromMCP]);
+
   // Parse task ID to determine if it's a subtask (e.g., "13.2")
   const parseTaskId = (id: string) => {
     const parts = id.split('.');
@@ -140,40 +201,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     };
   };
 
-  // Function to fetch complexity data from MCP API
-  const fetchComplexityFromMCP = async (taskId: string): Promise<number | undefined> => {
-    try {
-      console.log('📊 Fetching complexity data from MCP API for task:', taskId);
-      
-      // Use the complexity_report MCP tool to get complexity data
-      const complexityResult = await sendMessage({
-        type: 'mcpRequest',
-        tool: 'complexity_report',
-        parameters: {
-          projectRoot: undefined // Let the server determine the project root
-        }
-      });
-
-      if (complexityResult && complexityResult.data && complexityResult.data.report && complexityResult.data.report.complexityAnalysis) {
-        const taskAnalysis = complexityResult.data.report.complexityAnalysis.find(
-          (analysis: any) => String(analysis.taskId) === String(taskId)
-        );
-        
-        if (taskAnalysis) {
-          console.log('📊 Found complexity score from MCP:', taskAnalysis.complexityScore);
-          return taskAnalysis.complexityScore;
-        }
-      }
-      
-      console.log('📊 No complexity data found for task in MCP response');
-      return undefined;
-    } catch (error) {
-      console.error('❌ Error fetching complexity from MCP:', error);
-      return undefined;
-    }
-  };
-
-  // Function to fetch task file data (implementation details, test strategy, and complexity fallback)
+  // Function to fetch task file data (implementation details and test strategy only)
   const fetchTaskFileData = async () => {
     if (!currentTask?.id) return;
     
@@ -183,10 +211,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     try {
       console.log('📄 Fetching task file data for task:', currentTask.id);
       
-      // First, try to get complexity score from MCP API
-      const complexityFromMCP = await fetchComplexityFromMCP(currentTask.id);
-      
-      // Then get implementation details and test strategy from file
+      // Get implementation details and test strategy from file
       const fileData = await sendMessage({
         type: 'readTaskFileData',
         data: {
@@ -197,11 +222,11 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
       
       console.log('📄 Task file data response:', fileData);
       
-      // Combine MCP complexity with file data
+      // Combine file data with complexity score from task data (already loaded)
       const combinedData = {
         details: fileData.details,
         testStrategy: fileData.testStrategy,
-        complexityScore: complexityFromMCP // Only from MCP API now
+        complexityScore: currentTask.complexityScore // Use complexity score from already-loaded task data
       };
       
       console.log('📊 Combined task data:', combinedData);
@@ -310,11 +335,14 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
         });
       }
       
-      // Refresh task file data after update with longer delay for AI processing
+      // Refresh both task file data and complexity after AI operation
       setTimeout(() => {
         console.log('🔄 TaskDetailsView: Refreshing after AI regeneration');
         fetchTaskFileData();
       }, 2000); // Wait 2 seconds for AI to finish processing
+      
+      // Refresh complexity after AI operation
+      refreshComplexityAfterAI();
       
     } catch (error) {
       console.error('❌ TaskDetailsView: Failed to regenerate task:', error);
@@ -349,11 +377,14 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
         });
       }
       
-      // Refresh task file data after update with longer delay for AI processing
+      // Refresh both task file data and complexity after AI operation
       setTimeout(() => {
         console.log('🔄 TaskDetailsView: Refreshing after AI append');
         fetchTaskFileData();
       }, 2000); // Wait 2 seconds for AI to finish processing
+      
+      // Refresh complexity after AI operation
+      refreshComplexityAfterAI();
       
     } catch (error) {
       console.error('❌ TaskDetailsView: Failed to append to task:', error);
@@ -736,27 +767,36 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               </div>
 
                 {/* Complexity Score */}
-                {(taskFileData.complexityScore !== undefined || isLoadingTaskFileData) && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-vscode-foreground/70">Complexity</span>
-                      <div className="bg-vscode-input-background border border-vscode-input-border rounded-md px-3 py-1 text-sm text-vscode-foreground">
-                        {isLoadingTaskFileData ? (
-                          <div className="flex items-center">
-                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                            Loading...
-                          </div>
-                        ) : taskFileData.complexityScore ? (
-                          <div className="flex items-center">
-                            <span className="font-medium">{taskFileData.complexityScore}</span>
-                            <span className="text-xs text-vscode-foreground/50 ml-1">/10</span>
-                          </div>
-                        ) : (
-                          <span className="text-vscode-foreground/50">N/A</span>
-                        )}
+                {(displayComplexityScore !== undefined || isLoadingComplexity) && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+                      Complexity Score
+                    </label>
+                    {isLoadingComplexity ? (
+                      <div className="text-sm text-[var(--vscode-descriptionForeground)]">
+                        Loading...
                       </div>
-                    </div>
-                  </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-[var(--vscode-foreground)]">
+                          {displayComplexityScore}/10
+                        </span>
+                        <div className="flex-1 bg-[var(--vscode-progressBar-background)] rounded-full h-2">
+                          <div
+                            className="bg-[var(--vscode-progressBar-background)] h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${(displayComplexityScore || 0) * 10}%`,
+                              backgroundColor: displayComplexityScore && displayComplexityScore >= 7 
+                                ? '#f59e0b' 
+                                : displayComplexityScore && displayComplexityScore >= 4 
+                                ? '#3b82f6' 
+                                : '#10b981'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="border-b border-textSeparator-foreground"></div>
