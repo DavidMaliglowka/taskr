@@ -184,6 +184,35 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     }, 2000); // Wait for AI operation to complete
   }, [fetchComplexityFromMCP]);
 
+  // Handle running complexity analysis for a task
+  const handleRunComplexityAnalysis = useCallback(async () => {
+    if (!currentTask) return;
+    
+    setIsLoadingComplexity(true);
+    try {
+      // Run complexity analysis on this specific task
+      await sendMessage({
+        type: 'mcpRequest',
+        tool: 'analyze_project_complexity',
+        params: {
+          projectRoot: '/Users/david/Developer/Gauntlet/taskr-test-website',
+          ids: currentTask.id.toString(),
+          research: false
+        }
+      });
+      
+      // After analysis, fetch the updated complexity report
+      setTimeout(() => {
+        fetchComplexityFromMCP(true);
+      }, 1000); // Wait for analysis to complete
+      
+    } catch (error) {
+      console.error('Failed to run complexity analysis:', error);
+    } finally {
+      setIsLoadingComplexity(false);
+    }
+  }, [currentTask, sendMessage, fetchComplexityFromMCP]);
+
   // Parse task ID to determine if it's a subtask (e.g., "13.2")
   const parseTaskId = (id: string) => {
     const parts = id.split('.');
@@ -767,37 +796,66 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               </div>
 
                 {/* Complexity Score */}
-                {(displayComplexityScore !== undefined || isLoadingComplexity) && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-[var(--vscode-foreground)]">
-                      Complexity Score
-                    </label>
-                    {isLoadingComplexity ? (
-                      <div className="text-sm text-[var(--vscode-descriptionForeground)]">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[var(--vscode-foreground)]">
+                    Complexity Score
+                  </label>
+                  {isLoadingComplexity ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--vscode-descriptionForeground)]" />
+                      <span className="text-sm text-[var(--vscode-descriptionForeground)]">
                         Loading...
+                      </span>
+                    </div>
+                  ) : displayComplexityScore !== undefined ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[var(--vscode-foreground)]">
+                        {displayComplexityScore}/10
+                      </span>
+                      <div className={`flex-1 rounded-full h-2 ${
+                        displayComplexityScore >= 7 
+                          ? 'bg-red-500/20' 
+                          : displayComplexityScore >= 4 
+                          ? 'bg-yellow-500/20' 
+                          : 'bg-green-500/20'
+                      }`}>
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            displayComplexityScore >= 7 
+                              ? 'bg-red-500' 
+                              : displayComplexityScore >= 4 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`}
+                          style={{
+                            width: `${(displayComplexityScore || 0) * 10}%`
+                          }}
+                        />
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-[var(--vscode-foreground)]">
-                          {displayComplexityScore}/10
-                        </span>
-                        <div className="flex-1 bg-[var(--vscode-progressBar-background)] rounded-full h-2">
-                          <div
-                            className="bg-[var(--vscode-progressBar-background)] h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${(displayComplexityScore || 0) * 10}%`,
-                              backgroundColor: displayComplexityScore && displayComplexityScore >= 7 
-                                ? '#f59e0b' 
-                                : displayComplexityScore && displayComplexityScore >= 4 
-                                ? '#3b82f6' 
-                                : '#10b981'
-                            }}
-                          />
-                        </div>
+                    </div>
+                  ) : currentTask?.status === 'done' || currentTask?.status === 'deferred' || currentTask?.status === 'review' ? (
+                    <div className="text-sm text-[var(--vscode-descriptionForeground)]">
+                      N/A
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-sm text-[var(--vscode-descriptionForeground)]">
+                        No complexity score available
                       </div>
-                    )}
-                  </div>
-                )}
+                      <div className="mt-3">
+                        <Button
+                          onClick={() => handleRunComplexityAnalysis()}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          disabled={isRegenerating || isAppending}
+                        >
+                          Run Complexity Analysis
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="border-b border-textSeparator-foreground"></div>
 

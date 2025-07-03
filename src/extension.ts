@@ -878,6 +878,23 @@ export function activate(context: vscode.ExtensionContext) {
 									}
 									break;
 								
+								case 'analyze_project_complexity':
+									console.log('🧮 Calling analyze_project_complexity MCP tool');
+									try {
+										// Use the private callMCPTool method via type assertion to access it
+										const mcpResult = await (taskMasterApi as any).callMCPTool('analyze_project_complexity', {
+											projectRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+											...parameters
+										});
+										result = { success: true, data: mcpResult };
+									} catch (mcpError) {
+										result = { 
+											success: false, 
+											error: mcpError instanceof Error ? mcpError.message : 'Failed to analyze project complexity' 
+										};
+									}
+									break;
+								
 								default:
 									throw new Error(`Unsupported MCP tool: ${tool}`);
 							}
