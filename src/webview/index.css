@@ -25,7 +25,9 @@
     --color-destructive-foreground: var(--vscode-foreground);
     --color-border: var(--vscode-panel-border);
     --color-ring: var(--vscode-focusBorder);
-    --color-link: var(--vscode-textLink-foreground);
+    --color-link: var(--vscode-editorLink-foreground);
+    --color-link-hover: var(--vscode-editorLink-activeForeground);
+    --color-textSeparator-foreground: var(--vscode-textSeparator-foreground);
     --radius: 0.5rem;
   }
 

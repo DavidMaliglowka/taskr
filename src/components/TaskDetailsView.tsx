@@ -18,6 +18,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { ChevronRight, ChevronDown, Plus, Wand2, PlusCircle, Loader2 } from 'lucide-react';
 
 interface TaskDetailsViewProps {
   taskId: string;
@@ -49,12 +50,12 @@ const PriorityBadge: React.FC<{ priority: TaskMasterTask['priority'] }> = ({ pri
   );
 };
 
-// Custom Status Badge Component (matching Kanban board styling)
+// Custom Status Badge Component with dropdown styling
 const StatusBadge: React.FC<{ status: TaskMasterTask['status'] }> = ({ status }) => {
   const colorMap = {
     pending: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     'in-progress': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    review: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    review: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     done: 'bg-green-500/20 text-green-400 border-green-500/30',
     deferred: 'bg-red-500/20 text-red-400 border-red-500/30',
   };
@@ -70,7 +71,7 @@ const StatusBadge: React.FC<{ status: TaskMasterTask['status'] }> = ({ status })
       `}
       title={status}
     >
-      {status}
+      {status === 'pending' ? 'todo' : status}
     </span>
   );
 };
@@ -89,8 +90,17 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   const [currentTask, setCurrentTask] = useState<TaskMasterTask | null>(null);
   const [isSubtask, setIsSubtask] = useState(false);
   const [parentTask, setParentTask] = useState<TaskMasterTask | null>(null);
-  const [editedDescription, setEditedDescription] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  
+  // Collapsible section states
+  const [isAiActionsExpanded, setIsAiActionsExpanded] = useState(false);
+  const [isImplementationExpanded, setIsImplementationExpanded] = useState(false);
+  const [isTestStrategyExpanded, setIsTestStrategyExpanded] = useState(false);
+  const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
+  
+  // AI Actions states
+  const [prompt, setPrompt] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isAppending, setIsAppending] = useState(false);
 
   // Parse task ID to determine if it's a subtask (e.g., "13.2")
   const parseTaskId = (id: string) => {
@@ -123,7 +133,6 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
       if (parent && parent.subtasks && subtaskIndex >= 0 && subtaskIndex < parent.subtasks.length) {
         const subtask = parent.subtasks[subtaskIndex];
         setCurrentTask(subtask);
-        setEditedDescription(subtask.description || '');
       } else {
         setCurrentTask(null);
       }
@@ -132,50 +141,71 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
       const task = tasks.find(task => task.id === parentId);
       setCurrentTask(task || null);
       setParentTask(null);
-      setEditedDescription(task?.description || '');
     }
   }, [taskId, tasks]);
 
-  // Handle description save
-  const handleSaveDescription = async () => {
-    if (!currentTask || isSaving) return;
+  // Handle AI Actions
+  const handleRegenerate = async () => {
+    if (!currentTask || !prompt.trim()) return;
 
-    // Check if task is completed - TaskMaster prevents editing completed tasks
-    if (currentTask.status === 'done') {
-      return;
-    }
-
-    setIsSaving(true);
+    setIsRegenerating(true);
     try {
       if (isSubtask && parentTask) {
-        // For subtasks, we need to update the parent task's subtask
         await sendMessage({
-          type: 'updateTask',
+          type: 'updateSubtask',
           data: {
-            taskId: parentTask.id,
-            updates: {
-              // Update the specific subtask's description
-              // Note: This might need adjustment based on the MCP API structure
-              description: editedDescription,
-            },
-            options: { append: false, research: false }
+            taskId: `${parentTask.id}.${currentTask.id}`,
+            prompt: prompt,
+            options: { research: false }
           }
         });
       } else {
-        // For main tasks
         await sendMessage({
           type: 'updateTask',
           data: {
             taskId: currentTask.id,
-            updates: { description: editedDescription },
+            updates: { description: prompt },
             options: { append: false, research: false }
           }
         });
       }
     } catch (error) {
-      console.error('❌ TaskDetailsView: Failed to save description:', error);
+      console.error('❌ TaskDetailsView: Failed to regenerate task:', error);
     } finally {
-      setIsSaving(false);
+      setIsRegenerating(false);
+      setPrompt('');
+    }
+  };
+
+  const handleAppend = async () => {
+    if (!currentTask || !prompt.trim()) return;
+
+    setIsAppending(true);
+    try {
+      if (isSubtask && parentTask) {
+        await sendMessage({
+          type: 'updateSubtask',
+          data: {
+            taskId: `${parentTask.id}.${currentTask.id}`,
+            prompt: prompt,
+            options: { research: false }
+          }
+        });
+      } else {
+        await sendMessage({
+          type: 'updateTask',
+          data: {
+            taskId: currentTask.id,
+            updates: { description: prompt },
+            options: { append: true, research: false }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('❌ TaskDetailsView: Failed to append to task:', error);
+    } finally {
+      setIsAppending(false);
+      setPrompt('');
     }
   };
 
@@ -184,16 +214,21 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     onNavigateToTask(depId);
   };
 
-  // Check if editing should be disabled
-  const isEditingDisabled = currentTask?.status === 'done' || isSaving;
-  const getEditingDisabledReason = () => {
-    if (currentTask?.status === 'done') {
-      return 'Completed tasks cannot be edited to preserve work integrity';
+  // Handle status change
+  const handleStatusChange = async (newStatus: TaskMasterTask['status']) => {
+    if (!currentTask) return;
+
+    try {
+      await sendMessage({
+        type: 'updateTaskStatus',
+        data: {
+          taskId: isSubtask && parentTask ? `${parentTask.id}.${currentTask.id}` : currentTask.id,
+          newStatus: newStatus
+        }
+      });
+    } catch (error) {
+      console.error('❌ TaskDetailsView: Failed to update task status:', error);
     }
-    if (isSaving) {
-      return 'Saving changes...';
-    }
-    return '';
   };
 
   if (!currentTask) {
@@ -221,7 +256,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               <BreadcrumbItem>
                 <BreadcrumbLink 
                   onClick={onNavigateBack}
-                  className="cursor-pointer hover:text-vscode-foreground"
+                  className="cursor-pointer hover:text-vscode-foreground text-link"
                 >
                   Kanban Board
                 </BreadcrumbLink>
@@ -251,150 +286,262 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
             {currentTask.title}
           </h1>
 
-          {/* Description area */}
-          <div className="grid w-full gap-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Add description..."
-              value={editedDescription}
-              onChange={(e) => setEditedDescription(e.target.value)}
-              onBlur={handleSaveDescription}
-              className="min-h-[120px] resize-y"
-              disabled={isEditingDisabled}
-            />
-            {isSaving && (
-              <p className="text-xs text-vscode-foreground/50">Saving...</p>
-            )}
-            {/* Show disabled reason for completed tasks */}
-            {currentTask?.status === 'done' && (
-              <p className="text-xs text-vscode-foreground/60 italic">
-                💡 {getEditingDisabledReason()}
-              </p>
+          {/* Description (non-editable) */}
+          <div className="mb-8">
+            <p className="text-vscode-foreground/80 leading-relaxed">
+              {currentTask.description || 'No description available.'}
+            </p>
+          </div>
+
+          {/* AI Actions */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-0 h-auto text-purple-400 hover:text-purple-300"
+                onClick={() => setIsAiActionsExpanded(!isAiActionsExpanded)}
+              >
+                {isAiActionsExpanded ? (
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-1" />
+                )}
+                <Wand2 className="w-4 h-4 mr-1" />
+                AI Actions
+              </Button>
+            </div>
+
+            {isAiActionsExpanded && (
+              <div className="bg-purple-950/20 rounded-lg p-4 border border-purple-800/30">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="ai-prompt" className="block text-sm font-medium text-vscode-foreground/80 mb-2">
+                      Enter your prompt
+                    </Label>
+                    <Textarea
+                      id="ai-prompt"
+                      placeholder="Describe what you want to change or add to this task..."
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      className="min-h-[100px] bg-vscode-input-background border-vscode-input-border text-vscode-input-foreground placeholder-vscode-input-foreground/50 focus:border-purple-500 focus:ring-purple-500"
+                      disabled={isRegenerating || isAppending}
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleRegenerate}
+                      disabled={!prompt.trim() || isRegenerating || isAppending}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      {isRegenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Regenerating...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-4 h-4 mr-2" />
+                          Regenerate Task
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      onClick={handleAppend}
+                      disabled={!prompt.trim() || isRegenerating || isAppending}
+                      variant="outline"
+                      className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white bg-transparent"
+                    >
+                      {isAppending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Appending...
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle className="w-4 h-4 mr-2" />
+                          Append to Task
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="text-xs text-vscode-foreground/60 space-y-1">
+                    <p>
+                      <strong>Regenerate:</strong> Completely rewrites the task description and subtasks based on your prompt
+                    </p>
+                    <p>
+                      <strong>Append:</strong> Adds new content to the existing task description based on your prompt
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
+          {/* Implementation Details */}
+          {currentTask.details && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
+                  onClick={() => setIsImplementationExpanded(!isImplementationExpanded)}
+                >
+                  {isImplementationExpanded ? (
+                    <ChevronDown className="w-4 h-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 mr-1" />
+                  )}
+                  Implementation Details
+                </Button>
+              </div>
+
+              {isImplementationExpanded && (
+                <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
+                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
+                    {currentTask.details}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Test Strategy */}
+          {currentTask.testStrategy && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
+                  onClick={() => setIsTestStrategyExpanded(!isTestStrategyExpanded)}
+                >
+                  {isTestStrategyExpanded ? (
+                    <ChevronDown className="w-4 h-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 mr-1" />
+                  )}
+                  Test Strategy
+                </Button>
+              </div>
+
+              {isTestStrategyExpanded && (
+                <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
+                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
+                    {currentTask.testStrategy}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Subtasks section */}
           {currentTask.subtasks && currentTask.subtasks.length > 0 && (
-            <div className="space-y-3">
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-between h-auto p-4"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">Subtasks</span>
-                      <Badge variant="secondary">
-                        {currentTask.subtasks.filter(st => st.status === 'done').length} / {currentTask.subtasks.length}
-                      </Badge>
-                    </div>
-                    <span className="text-xs text-muted-foreground">Click to toggle</span>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-3">
-                  <div className="space-y-3">
-                    {currentTask.subtasks.map((subtask, index) => {
-                      const subtaskId = `${currentTask.id}.${index + 1}`;
-                      return (
-                        <Card 
-                          key={subtask.id} 
-                          className="cursor-pointer hover:bg-vscode-input/20 transition-colors"
-                          onClick={() => onNavigateToTask(subtaskId)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="space-y-2">
-                              {/* Subtask header */}
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="font-medium text-sm flex-1">
-                                  {subtask.title}
-                                </h4>
-                                <StatusBadge status={subtask.status} />
-                              </div>
-                              
-                              {/* Subtask description */}
-                              {subtask.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-2">
-                                  {subtask.description}
-                                </p>
-                              )}
-                              
-                              {/* Subtask dependencies */}
-                              {subtask.dependencies && subtask.dependencies.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground">Depends on:</span>
-                                  <div className="flex gap-1 flex-wrap">
-                                    {subtask.dependencies.map((depId) => {
-                                      const depTask = tasks.find(t => t.id === depId);
-                                      const isCompleted = depTask?.status === 'done';
-                                      return (
-                                        <Button
-                                          key={depId}
-                                          variant="link"
-                                          size="sm"
-                                          className="h-auto p-0 text-xs"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDependencyClick(depId);
-                                          }}
-                                        >
-                                          <span className={isCompleted ? 'text-green-400' : 'text-muted-foreground'}>
-                                            {isCompleted ? '✅' : '⏱️'} Task {depId}
-                                          </span>
-                                        </Button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-          )}
-
-          {/* Details section */}
-          {currentTask.details && (
-            <div className="grid w-full gap-1.5">
-              <Label>Implementation Details</Label>
-              <div className="p-3 bg-vscode-input/30 rounded-md border">
-                <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
-                  {currentTask.details}
-                </pre>
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-0 h-auto text-vscode-foreground/70 hover:text-vscode-foreground"
+                  onClick={() => setIsSubtasksExpanded(!isSubtasksExpanded)}
+                >
+                  {isSubtasksExpanded ? (
+                    <ChevronDown className="w-4 h-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 mr-1" />
+                  )}
+                  Sub-issues
+                </Button>
+                <span className="text-sm text-vscode-foreground/50">
+                  {currentTask.subtasks.filter(st => st.status === 'done').length}/{currentTask.subtasks.length}
+                </span>
+                <Button variant="ghost" size="sm" className="ml-auto p-1 h-6 w-6">
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
-            </div>
-          )}
 
-          {/* Test Strategy section */}
-          {currentTask.testStrategy && (
-            <div className="grid w-full gap-1.5">
-              <Label>Test Strategy</Label>
-              <div className="p-3 bg-vscode-input/30 rounded-md border">
-                <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
-                  {currentTask.testStrategy}
-                </pre>
-              </div>
+              {isSubtasksExpanded && (
+                <div className="space-y-3">
+                  {currentTask.subtasks.map((subtask, index) => {
+                    const subtaskId = `${currentTask.id}.${index + 1}`;
+                    const statusColorMap = {
+                      pending: 'bg-gray-600',
+                      'in-progress': 'bg-yellow-500',
+                      review: 'bg-blue-500',
+                      done: 'bg-green-500',
+                      deferred: 'bg-red-500',
+                    };
+                    const statusBadgeMap = {
+                      pending: 'bg-gray-800 text-gray-400',
+                      'in-progress': 'bg-yellow-900/30 text-yellow-400 border-yellow-800',
+                      review: 'bg-blue-900/30 text-blue-400 border-blue-800',
+                      done: 'bg-green-900/30 text-green-400 border-green-800',
+                      deferred: 'bg-red-900/30 text-red-400 border-red-800',
+                    };
+
+                    return (
+                      <div 
+                        key={subtask.id}
+                        className="flex items-center gap-3 p-3 rounded-md border border-textSeparator-foreground hover:border-vscode-border/70 transition-colors cursor-pointer"
+                        onClick={() => onNavigateToTask(subtaskId)}
+                      >
+                        <div className={`w-4 h-4 rounded-full ${statusColorMap[subtask.status]} flex items-center justify-center`}>
+                          <div className="w-2 h-2 bg-white rounded-full" />
+                        </div>
+                        <span className="flex-1 text-vscode-foreground">{subtask.title}</span>
+                        <Badge variant="secondary" className={`${statusBadgeMap[subtask.status]} border`}>
+                          {subtask.status === 'pending' ? 'todo' : subtask.status}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Right column - Properties sidebar (1/3 width) */}
-        <div className="md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Properties</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              {/* Status */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Status</span>
-                <StatusBadge status={currentTask.status} />
+        <div className="md:col-span-1 border-l border-textSeparator-foreground">
+          <div className="p-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-vscode-foreground/70 mb-3">Properties</h3>
               </div>
+
+              <div className="space-y-4">
+                {/* Status */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-vscode-foreground/70">Status</span>
+                  <select
+                    value={currentTask.status}
+                    onChange={(e) => handleStatusChange(e.target.value as TaskMasterTask['status'])}
+                    className={`border rounded-md px-3 py-1 text-sm font-medium focus:ring-1 bg-vscode-input-background border-vscode-input-border text-vscode-input-foreground focus:border-vscode-focusBorder focus:ring-vscode-focusBorder ${
+                      currentTask.status === 'pending'
+                        ? 'text-gray-400'
+                        : currentTask.status === 'in-progress'
+                          ? 'text-yellow-400'
+                          : currentTask.status === 'review'
+                            ? 'text-blue-400'
+                            : currentTask.status === 'done'
+                              ? 'text-green-400'
+                              : currentTask.status === 'deferred'
+                                ? 'text-red-400'
+                                : 'text-vscode-foreground'
+                    }`}
+                  >
+                    <option value="pending">To do</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                    <option value="deferred">Deferred</option>
+                  </select>
+                </div>
+
 
               {/* Priority */}
               <div className="flex items-center justify-between">
@@ -402,52 +549,53 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                 <PriorityBadge priority={currentTask.priority} />
               </div>
 
-              {/* Complexity Score */}
-              {currentTask.complexityScore && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Complexity</span>
-                  <Badge variant="secondary">
-                    {currentTask.complexityScore}/10
-                  </Badge>
-                </div>
-              )}
+                {/* Complexity Score */}
+                {currentTask.complexityScore && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-vscode-foreground/70">Complexity</span>
+                      <div className="bg-vscode-input-background border border-vscode-input-border rounded-md px-3 py-1 text-sm text-vscode-foreground">
+                        {currentTask.complexityScore}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="border-b border-textSeparator-foreground"></div>
 
               {/* Dependencies */}
               {currentTask.dependencies && currentTask.dependencies.length > 0 && (
                 <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Dependencies</h4>
-                    <div className="space-y-1">
+                
+                  <div>
+                    <h4 className="text-sm font-medium text-vscode-foreground/70 mb-3">Dependencies</h4>
+                    <div className="space-y-2">
                       {currentTask.dependencies.map((depId) => {
                         const depTask = tasks.find(t => t.id === depId);
                         const fullTitle = `Task ${depId}: ${depTask?.title || 'Unknown Task'}`;
                         const truncatedTitle = fullTitle.length > 40 ? fullTitle.substring(0, 37) + '...' : fullTitle;
                         return (
-                          <Button
+                          <div
                             key={depId}
-                            variant="link"
-                            asChild
-                            className="p-0 h-auto justify-start text-left w-full text-link"
+                            className="text-sm text-link cursor-pointer hover:text-link-hover"
                             onClick={() => handleDependencyClick(depId)}
+                            title={fullTitle}
                           >
-                            <div className="cursor-pointer w-full">
-                              <span 
-                                className="text-sm block truncate w-full" 
-                                title={fullTitle}
-                              >
-                                {truncatedTitle}
-                              </span>
-                            </div>
-                          </Button>
+                            {truncatedTitle}
+                          </div>
                         );
                       })}
                     </div>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+
+              {/* Divider after Dependencies */}
+              {currentTask.dependencies && currentTask.dependencies.length > 0 && (
+                <div className="border-b border-textSeparator-foreground"></div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
