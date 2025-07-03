@@ -17,15 +17,15 @@
     --color-primary-foreground: var(--vscode-button-foreground);
     --color-secondary: var(--vscode-button-secondaryBackground);
     --color-secondary-foreground: var(--vscode-button-secondaryForeground);
-    --color-muted: var(--vscode-input-background);
-    --color-muted-foreground: var(--vscode-input-foreground);
+    --color-input-background: var(--vscode-input-background);
+    --color-input-foreground: var(--vscode-input-foreground);
     --color-accent: var(--vscode-focusBorder);
     --color-accent-foreground: var(--vscode-foreground);
     --color-destructive: var(--vscode-errorForeground);
     --color-destructive-foreground: var(--vscode-foreground);
     --color-border: var(--vscode-panel-border);
-    --color-input: var(--vscode-input-background);
     --color-ring: var(--vscode-focusBorder);
+    --color-link: var(--vscode-textLink-foreground);
     --radius: 0.5rem;
   }
 

@@ -20,6 +20,56 @@ interface TaskDetailsViewProps {
   onNavigateToTask: (taskId: string) => void;
 }
 
+// Custom Priority Badge Component (matching Kanban board styling)
+const PriorityBadge: React.FC<{ priority: TaskMasterTask['priority'] }> = ({ priority }) => {
+  const colorMap = {
+    high: 'bg-red-500/20 text-red-400 border-red-500/30',
+    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    low: 'bg-green-500/20 text-green-400 border-green-500/30',
+  };
+
+  return (
+    <span 
+      className={`
+        inline-flex items-center justify-center
+        px-2 py-0.5
+        rounded text-xs font-medium border 
+        min-w-[50px]
+        ${colorMap[priority]}
+      `}
+      title={priority}
+    >
+      {priority}
+    </span>
+  );
+};
+
+// Custom Status Badge Component (matching Kanban board styling)
+const StatusBadge: React.FC<{ status: TaskMasterTask['status'] }> = ({ status }) => {
+  const colorMap = {
+    pending: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    'in-progress': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    review: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    done: 'bg-green-500/20 text-green-400 border-green-500/30',
+    deferred: 'bg-red-500/20 text-red-400 border-red-500/30',
+  };
+
+  return (
+    <span 
+      className={`
+        inline-flex items-center justify-center
+        px-2 py-0.5
+        rounded text-xs font-medium border 
+        min-w-[60px]
+        ${colorMap[status]}
+      `}
+      title={status}
+    >
+      {status}
+    </span>
+  );
+};
+
 export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   taskId,
   onNavigateBack,
@@ -122,28 +172,6 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   // Handle dependency navigation
   const handleDependencyClick = (depId: string) => {
     onNavigateToTask(depId);
-  };
-
-  // Get priority badge variant
-  const getPriorityVariant = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'destructive';
-      case 'medium': return 'default';
-      case 'low': return 'secondary';
-      default: return 'secondary';
-    }
-  };
-
-  // Get status badge variant
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'done': return 'default';
-      case 'in-progress': return 'default';
-      case 'pending': return 'secondary';
-      case 'deferred': return 'secondary';
-      case 'review': return 'default';
-      default: return 'secondary';
-    }
   };
 
   if (!currentTask) {
@@ -253,17 +281,13 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               {/* Status */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
-                <Badge variant={getStatusVariant(currentTask.status)}>
-                  {currentTask.status}
-                </Badge>
+                <StatusBadge status={currentTask.status} />
               </div>
 
               {/* Priority */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Priority</span>
-                <Badge variant={getPriorityVariant(currentTask.priority)}>
-                  {currentTask.priority}
-                </Badge>
+                <PriorityBadge priority={currentTask.priority} />
               </div>
 
               {/* Complexity Score */}
@@ -292,7 +316,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                             key={depId}
                             variant="link"
                             asChild
-                            className="p-0 h-auto justify-start text-left w-full"
+                            className="p-0 h-auto justify-start text-left w-full text-link"
                             onClick={() => handleDependencyClick(depId)}
                           >
                             <div className="cursor-pointer w-full">

@@ -553,7 +553,7 @@ const TaskEditModal: React.FC<{
             <textarea
               value={formData.description || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 bg-vscode-input border border-vscode-border rounded text-vscode-foreground focus:outline-none focus:ring-2 focus:ring-vscode-focusBorder"
+              className="w-full px-3 py-2 bg-input-background border border-border rounded text-input-foreground focus:outline-none focus:ring-2 focus:ring-vscode-focusBorder"
               rows={3}
               required
             />
@@ -608,7 +608,7 @@ const TaskEditModal: React.FC<{
               type="text"
               value={formData.dependencies?.join(', ') || ''}
               onChange={(e) => handleDependenciesChange(e.target.value)}
-              className="w-full px-3 py-2 bg-vscode-input border border-vscode-border rounded text-vscode-foreground focus:outline-none focus:ring-2 focus:ring-vscode-focusBorder"
+              className="w-full px-3 py-2 bg-vscode-input border border-vscode-border rounded text-link focus:outline-none focus:ring-2 focus:ring-vscode-focusBorder"
               placeholder="1, 2, 3"
             />
           </div>
