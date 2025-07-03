@@ -1,4 +1,5 @@
-import { TaskMasterTask } from '../webview/index';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface TaskFileData {
   details?: string;
@@ -15,7 +16,13 @@ export interface TasksJsonStructure {
   };
 }
 
-export interface TaskWithDetails extends TaskMasterTask {
+export interface TaskWithDetails {
+  id: string | number;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  dependencies?: (string | number)[];
   details?: string;
   testStrategy?: string;
   subtasks?: TaskWithDetails[];
@@ -85,8 +92,8 @@ export async function readTaskFileData(taskId: string, tagName: string = 'master
  */
 export function findTaskById(tasks: TaskWithDetails[], taskId: string): TaskWithDetails | undefined {
   for (const task of tasks) {
-    // Handle both string and number task IDs
-    if (String(task.id) === taskId) {
+    // Convert both to strings for comparison to handle string vs number IDs
+    if (String(task.id) === String(taskId)) {
       return task;
     }
     
@@ -103,50 +110,47 @@ export function findTaskById(tasks: TaskWithDetails[], taskId: string): TaskWith
 }
 
 /**
- * Parses tasks.json content and extracts task file data
+ * Parses tasks.json content and extracts task file data (details and testStrategy only)
  * @param content - Raw tasks.json content
  * @param taskId - Task ID to find
  * @param tagName - Tag name to use
- * @returns TaskFileData with details and testStrategy
+ * @param workspacePath - Path to workspace root (not used anymore but kept for compatibility)
+ * @returns TaskFileData with details and testStrategy only
  */
-export function parseTaskFileData(content: string, taskId: string, tagName: string): TaskFileData {
+export function parseTaskFileData(content: string, taskId: string, tagName: string, workspacePath?: string): TaskFileData {
+  console.log('🔍 parseTaskFileData called with:', { taskId, tagName, contentLength: content.length });
+  
   try {
     const tasksJson: TasksJsonStructure = JSON.parse(content);
-    console.log('🔍 Parsed tasks.json structure, available tags:', Object.keys(tasksJson));
+    console.log('📊 Available tags:', Object.keys(tasksJson));
     
     // Get the tag data
     const tagData = tasksJson[tagName];
     if (!tagData || !tagData.tasks) {
-      console.log(`❌ No tag data found for tag: ${tagName}`);
+      console.log('❌ Tag not found or no tasks in tag:', tagName);
       return { details: undefined, testStrategy: undefined };
     }
     
-    console.log(`🔍 Found ${tagData.tasks.length} tasks in tag '${tagName}', looking for task ID: ${taskId}`);
+    console.log('📋 Tag found with', tagData.tasks.length, 'tasks');
+    console.log('🔍 Available task IDs:', tagData.tasks.map(t => t.id));
     
     // Find the task
     const task = findTaskById(tagData.tasks, taskId);
     if (!task) {
-      console.log(`❌ Task with ID '${taskId}' not found in tag '${tagName}'`);
-      // Log available task IDs for debugging
-      const availableIds = tagData.tasks.map(t => String(t.id));
-      console.log(`Available task IDs: ${availableIds.join(', ')}`);
+      console.log('❌ Task not found:', taskId);
       return { details: undefined, testStrategy: undefined };
     }
     
-    console.log(`✅ Found task ${taskId}:`, {
-      title: task.title,
-      hasDetails: !!task.details,
-      hasTestStrategy: !!task.testStrategy,
-      detailsLength: task.details?.length || 0,
-      testStrategyLength: task.testStrategy?.length || 0
-    });
+    console.log('✅ Task found:', task.id);
+    console.log('📝 Task has details:', !!task.details, 'length:', task.details?.length);
+    console.log('🧪 Task has testStrategy:', !!task.testStrategy, 'length:', task.testStrategy?.length);
     
     return {
       details: task.details,
       testStrategy: task.testStrategy
     };
   } catch (error) {
-    console.error('Error parsing tasks.json:', error);
+    console.error('❌ Error parsing tasks.json:', error);
     return { details: undefined, testStrategy: undefined };
   }
 } 

@@ -82,6 +82,12 @@ interface TaskFileData {
   testStrategy?: string;
 }
 
+interface CombinedTaskData {
+  details?: string;
+  testStrategy?: string;
+  complexityScore?: number; // Only from MCP API
+}
+
 export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   taskId,
   onNavigateBack,
@@ -98,7 +104,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   const [parentTask, setParentTask] = useState<TaskMasterTask | null>(null);
   
   // Collapsible section states
-  const [isAiActionsExpanded, setIsAiActionsExpanded] = useState(false);
+  const [isAiActionsExpanded, setIsAiActionsExpanded] = useState(true);
   const [isImplementationExpanded, setIsImplementationExpanded] = useState(false);
   const [isTestStrategyExpanded, setIsTestStrategyExpanded] = useState(false);
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
@@ -108,8 +114,12 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isAppending, setIsAppending] = useState(false);
   
-  // Task file data states (for implementation details and test strategy)
-  const [taskFileData, setTaskFileData] = useState<TaskFileData>({ details: undefined, testStrategy: undefined });
+  // Task file data states (for implementation details, test strategy, and complexity score)
+  const [taskFileData, setTaskFileData] = useState<CombinedTaskData>({ 
+    details: undefined, 
+    testStrategy: undefined, 
+    complexityScore: undefined 
+  });
   const [isLoadingTaskFileData, setIsLoadingTaskFileData] = useState(false);
   const [taskFileDataError, setTaskFileDataError] = useState<string | null>(null);
 
@@ -130,38 +140,76 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     };
   };
 
-  // Fetch task file data (implementation details and test strategy)
-  const fetchTaskFileData = async (targetTaskId: string) => {
-    if (!targetTaskId) return;
+  // Function to fetch complexity data from MCP API
+  const fetchComplexityFromMCP = async (taskId: string): Promise<number | undefined> => {
+    try {
+      console.log('📊 Fetching complexity data from MCP API for task:', taskId);
+      
+      // Use the complexity_report MCP tool to get complexity data
+      const complexityResult = await sendMessage({
+        type: 'mcpRequest',
+        tool: 'complexity_report',
+        parameters: {
+          projectRoot: undefined // Let the server determine the project root
+        }
+      });
+
+      if (complexityResult && complexityResult.data && complexityResult.data.report && complexityResult.data.report.complexityAnalysis) {
+        const taskAnalysis = complexityResult.data.report.complexityAnalysis.find(
+          (analysis: any) => String(analysis.taskId) === String(taskId)
+        );
+        
+        if (taskAnalysis) {
+          console.log('📊 Found complexity score from MCP:', taskAnalysis.complexityScore);
+          return taskAnalysis.complexityScore;
+        }
+      }
+      
+      console.log('📊 No complexity data found for task in MCP response');
+      return undefined;
+    } catch (error) {
+      console.error('❌ Error fetching complexity from MCP:', error);
+      return undefined;
+    }
+  };
+
+  // Function to fetch task file data (implementation details, test strategy, and complexity fallback)
+  const fetchTaskFileData = async () => {
+    if (!currentTask?.id) return;
     
-    console.log('📄 TaskDetailsView: Fetching task file data for:', targetTaskId);
     setIsLoadingTaskFileData(true);
     setTaskFileDataError(null);
     
     try {
-      // Send message to extension to read task file data
-      console.log('📤 TaskDetailsView: Sending readTaskFileData message');
-      const response = await sendMessage({
+      console.log('📄 Fetching task file data for task:', currentTask.id);
+      
+      // First, try to get complexity score from MCP API
+      const complexityFromMCP = await fetchComplexityFromMCP(currentTask.id);
+      
+      // Then get implementation details and test strategy from file
+      const fileData = await sendMessage({
         type: 'readTaskFileData',
         data: {
-          taskId: targetTaskId,
-          tag: 'master' // Default to master tag
+          taskId: currentTask.id,
+          tag: 'master' // TODO: Make this configurable
         }
       });
       
-      console.log('📨 TaskDetailsView: Received response:', response);
+      console.log('📄 Task file data response:', fileData);
       
-      // The response IS the data object with details and testStrategy
-      if (response && (response.details !== undefined || response.testStrategy !== undefined)) {
-        console.log('✅ TaskDetailsView: Setting task file data:', response);
-        setTaskFileData(response);
-      } else {
-        throw new Error('No task file data found in response');
-      }
+      // Combine MCP complexity with file data
+      const combinedData = {
+        details: fileData.details,
+        testStrategy: fileData.testStrategy,
+        complexityScore: complexityFromMCP // Only from MCP API now
+      };
+      
+      console.log('📊 Combined task data:', combinedData);
+      setTaskFileData(combinedData);
+      
     } catch (error) {
-      console.error('❌ TaskDetailsView: Failed to fetch task file data:', error);
-      setTaskFileDataError(error instanceof Error ? error.message : 'Failed to load task details');
-      setTaskFileData({ details: undefined, testStrategy: undefined });
+      console.error('❌ Error fetching task file data:', error);
+      setTaskFileDataError(error instanceof Error ? error.message : 'Failed to load task data');
     } finally {
       setIsLoadingTaskFileData(false);
     }
@@ -182,7 +230,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
         const subtask = parent.subtasks[subtaskIndex];
         setCurrentTask(subtask);
         // Fetch file data for subtask
-        fetchTaskFileData(taskId);
+        fetchTaskFileData();
       } else {
         setCurrentTask(null);
       }
@@ -193,22 +241,48 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
       setParentTask(null);
       // Fetch file data for main task
       if (task) {
-        fetchTaskFileData(taskId);
+        fetchTaskFileData();
       }
     }
   }, [taskId, tasks]);
 
-  // Refresh task file data when tasks are updated from polling
+  // Enhanced refresh logic for task file data when tasks are updated from polling
   useEffect(() => {
     if (currentTask) {
+      // Create a comprehensive hash of task data to detect any changes
+      const taskHash = JSON.stringify({
+        id: currentTask.id,
+        title: currentTask.title,
+        description: currentTask.description,
+        status: currentTask.status,
+        priority: currentTask.priority,
+        dependencies: currentTask.dependencies,
+        subtasksCount: currentTask.subtasks?.length || 0,
+        subtasksStatus: currentTask.subtasks?.map(st => st.status) || [],
+        lastUpdate: Date.now() // Include timestamp to ensure periodic refresh
+      });
+
       // Small delay to ensure the tasks.json file has been updated
       const timeoutId = setTimeout(() => {
-        fetchTaskFileData(taskId);
+        console.log('🔄 TaskDetailsView: Refreshing task file data due to task changes');
+        fetchTaskFileData();
       }, 500);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [currentTask?.status, currentTask?.description, tasks.length]); // Re-fetch when task status or description changes
+  }, [currentTask, tasks, taskId]); // More comprehensive dependencies
+
+  // Periodic refresh to ensure we have the latest data
+  useEffect(() => {
+    if (currentTask) {
+      const intervalId = setInterval(() => {
+        console.log('🔄 TaskDetailsView: Periodic refresh of task file data');
+        fetchTaskFileData();
+      }, 30000); // Refresh every 30 seconds
+
+      return () => clearInterval(intervalId);
+    }
+  }, [currentTask, taskId]);
 
   // Handle AI Actions
   const handleRegenerate = async () => {
@@ -236,10 +310,11 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
         });
       }
       
-      // Refresh task file data after update
+      // Refresh task file data after update with longer delay for AI processing
       setTimeout(() => {
-        fetchTaskFileData(taskId);
-      }, 1000); // Wait 1 second for AI to finish processing
+        console.log('🔄 TaskDetailsView: Refreshing after AI regeneration');
+        fetchTaskFileData();
+      }, 2000); // Wait 2 seconds for AI to finish processing
       
     } catch (error) {
       console.error('❌ TaskDetailsView: Failed to regenerate task:', error);
@@ -274,10 +349,11 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
         });
       }
       
-      // Refresh task file data after update
+      // Refresh task file data after update with longer delay for AI processing
       setTimeout(() => {
-        fetchTaskFileData(taskId);
-      }, 1000); // Wait 1 second for AI to finish processing
+        console.log('🔄 TaskDetailsView: Refreshing after AI append');
+        fetchTaskFileData();
+      }, 2000); // Wait 2 seconds for AI to finish processing
       
     } catch (error) {
       console.error('❌ TaskDetailsView: Failed to append to task:', error);
@@ -660,12 +736,24 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               </div>
 
                 {/* Complexity Score */}
-                {currentTask.complexityScore && (
+                {(taskFileData.complexityScore !== undefined || isLoadingTaskFileData) && (
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-vscode-foreground/70">Complexity</span>
                       <div className="bg-vscode-input-background border border-vscode-input-border rounded-md px-3 py-1 text-sm text-vscode-foreground">
-                        {currentTask.complexityScore}
+                        {isLoadingTaskFileData ? (
+                          <div className="flex items-center">
+                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            Loading...
+                          </div>
+                        ) : taskFileData.complexityScore ? (
+                          <div className="flex items-center">
+                            <span className="font-medium">{taskFileData.complexityScore}</span>
+                            <span className="text-xs text-vscode-foreground/50 ml-1">/10</span>
+                          </div>
+                        ) : (
+                          <span className="text-vscode-foreground/50">N/A</span>
+                        )}
                       </div>
                     </div>
                   </>

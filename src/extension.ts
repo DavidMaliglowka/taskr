@@ -812,7 +812,7 @@ export function activate(context: vscode.ExtensionContext) {
 								// Use legacy path
 								const content = fs.readFileSync(legacyPath, 'utf8');
 								console.log('📖 Read legacy tasks.json, content length:', content.length);
-								const taskData = parseTaskFileData(content, taskId, tagName);
+								const taskData = parseTaskFileData(content, taskId, tagName, workspaceFolder.uri.fsPath);
 								console.log('✅ Parsed task data for legacy path:', taskData);
 								panel.webview.postMessage({
 									type: 'response',
@@ -825,7 +825,7 @@ export function activate(context: vscode.ExtensionContext) {
 							// Read and parse tasks.json
 							const content = fs.readFileSync(tasksJsonPath, 'utf8');
 							console.log('📖 Read tasks.json, content length:', content.length);
-							const taskData = parseTaskFileData(content, taskId, tagName);
+							const taskData = parseTaskFileData(content, taskId, tagName, workspaceFolder.uri.fsPath);
 							console.log('✅ Parsed task data:', taskData);
 							
 							panel.webview.postMessage({
@@ -842,6 +842,63 @@ export function activate(context: vscode.ExtensionContext) {
 								type: 'error',
 								requestId,
 								error: error instanceof Error ? error.message : 'Failed to read task file data'
+							});
+						}
+						break;
+						
+					case 'mcpRequest':
+						console.log('📊 MCP Request:', message);
+						const { requestId: mcpRequestId, tool, parameters } = message;
+						try {
+							if (!taskMasterApi) {
+								throw new Error('Task Master API not initialized');
+							}
+							
+							if (pollingState.isOfflineMode) {
+								throw new Error('Task Master is in offline mode - MCP server connection unavailable');
+							}
+							
+							let result;
+							
+							switch (tool) {
+								case 'complexity_report':
+									console.log('📊 Calling complexity_report MCP tool');
+									try {
+										// Use the private callMCPTool method via type assertion to access it
+										const mcpResult = await (taskMasterApi as any).callMCPTool('complexity_report', {
+											projectRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+											...parameters
+										});
+										result = { success: true, data: mcpResult };
+									} catch (mcpError) {
+										result = { 
+											success: false, 
+											error: mcpError instanceof Error ? mcpError.message : 'Failed to get complexity report' 
+										};
+									}
+									break;
+								
+								default:
+									throw new Error(`Unsupported MCP tool: ${tool}`);
+							}
+							
+							if (result.success) {
+								panel.webview.postMessage({
+									type: 'response',
+									requestId: mcpRequestId,
+									data: result.data
+								});
+								console.log(`✅ MCP tool ${tool} executed successfully`);
+							} else {
+								throw new Error(result.error || `Failed to execute MCP tool: ${tool}`);
+							}
+							
+						} catch (error) {
+							console.error(`❌ Error executing MCP tool ${tool}:`, error);
+							panel.webview.postMessage({
+								type: 'error',
+								requestId: mcpRequestId,
+								error: error instanceof Error ? error.message : `Failed to execute MCP tool: ${tool}`
 							});
 						}
 						break;
