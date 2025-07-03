@@ -704,6 +704,7 @@ const TaskMasterKanban: React.FC = () => {
 
   const { state, dispatch, sendMessage, availableHeight } = context;
   const { tasks, loading, error, editingTask, polling, currentView, selectedTaskId } = state;
+  const [activeTask, setActiveTask] = React.useState<TaskMasterTask | null>(null);
 
   // Calculate header height for proper kanban board sizing
   const headerHeight = 73; // Header with padding and border
@@ -773,15 +774,22 @@ const TaskMasterKanban: React.FC = () => {
     }
   };
 
-  // Handle drag start - mark user as interacting
-  const handleDragStart = () => {
+  // Handle drag start - mark user as interacting and set active task
+  const handleDragStart = (event: DragEndEvent) => {
     console.log('🖱️ User started dragging, pausing updates');
     dispatch({ type: 'SET_USER_INTERACTING', payload: true });
+    
+    const taskId = event.active.id as string;
+    const task = tasks.find(t => t.id === taskId);
+    setActiveTask(task || null);
   };
 
   // Handle drag end - allow updates again after a delay
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    
+    // Clear active task
+    setActiveTask(null);
     
     // Re-enable updates after drag completes
     setTimeout(() => {
@@ -950,6 +958,17 @@ const TaskMasterKanban: React.FC = () => {
               w-full h-full
               overflow-x-auto overflow-y-hidden
             "
+            dragOverlay={
+              activeTask ? (
+                <TaskCard 
+                  task={activeTask} 
+                  index={0} 
+                  status={activeTask.status}
+                  onEdit={() => {}}
+                  onViewDetails={() => {}}
+                />
+              ) : null
+            }
           >
             <div className="
               flex gap-4 

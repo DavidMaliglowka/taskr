@@ -5,9 +5,14 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
   DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
   rectIntersection,
   useDraggable,
   useDroppable,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { ReactNode } from 'react';
@@ -76,78 +81,13 @@ export const KanbanCard = ({
       data: { index, parent },
     });
 
-  const [dragStartTime, setDragStartTime] = React.useState(0);
-  const [dragStartPos, setDragStartPos] = React.useState<{x: number, y: number} | null>(null);
-  const [isDragOperation, setIsDragOperation] = React.useState(false);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setDragStartTime(Date.now());
-    setDragStartPos({ x: e.clientX, y: e.clientY });
-    setIsDragOperation(false);
-    
-    // Call the original drag listener
-    if (listeners?.onMouseDown) {
-      listeners.onMouseDown(e);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (dragStartPos) {
-      const currentPos = { x: e.clientX, y: e.clientY };
-      const distance = Math.sqrt(
-        Math.pow(currentPos.x - dragStartPos.x, 2) + 
-        Math.pow(currentPos.y - dragStartPos.y, 2)
-      );
-      
-      // If significant movement detected, mark as drag operation
-      if (distance > 8) {
-        setIsDragOperation(true);
-      }
-    }
-    
-    // Call the original drag listener
-    if (listeners?.onMouseMove) {
-      listeners.onMouseMove(e);
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    const clickDuration = Date.now() - dragStartTime;
-    
-    // Only handle click if it's a quick action with minimal movement (not a drag)
-    if (!isDragOperation && clickDuration < 500) {
-      // Small delay to ensure drag operations are complete
-      setTimeout(() => {
-        if (!isDragging) {
-          onClick?.(e);
-        }
-      }, 10);
-    }
-    
-    // Reset state
-    setDragStartTime(0);
-    setDragStartPos(null);
-    setIsDragOperation(false);
-    
-    // Call the original drag listener
-    if (listeners?.onMouseUp) {
-      listeners.onMouseUp(e);
-    }
-  };
-
-  // Merge drag listeners with our custom handlers
-  const mergedListeners = {
-    ...listeners,
-    onMouseDown: handleMouseDown,
-    onMouseMove: handleMouseMove,
-    onMouseUp: handleMouseUp,
-  };
 
   return (
     <Card
       className={cn(
         'rounded-md p-3 shadow-sm',
-        isDragging && 'cursor-grabbing',
+        isDragging && 'cursor-grabbing opacity-0',
         !isDragging && 'cursor-pointer',
         className
       )}
@@ -157,7 +97,8 @@ export const KanbanCard = ({
           : 'none',
       }}
       {...attributes}
-      {...mergedListeners}
+      {...listeners}
+      onClick={(e) => !isDragging && onClick?.(e)}
       onDoubleClick={onDoubleClick}
       ref={setNodeRef}
     >
@@ -203,6 +144,7 @@ export type KanbanProviderProps = {
   onDragEnd: (event: DragEndEvent) => void;
   onDragStart?: (event: DragEndEvent) => void;
   className?: string;
+  dragOverlay?: ReactNode;
 };
 
 export const KanbanProvider = ({
@@ -210,16 +152,35 @@ export const KanbanProvider = ({
   onDragEnd,
   onDragStart,
   className,
-}: KanbanProviderProps) => (
-  <DndContext 
-    collisionDetection={rectIntersection} 
-    onDragEnd={onDragEnd}
-    onDragStart={onDragStart}
-  >
-    <div
-      className={cn('grid w-full auto-cols-fr grid-flow-col gap-4', className)}
+  dragOverlay,
+}: KanbanProviderProps) => {
+  // Configure sensors with activation constraints to prevent accidental drags
+  const sensors = useSensors(
+    // Only start a drag if you've moved more than 8px
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    // On touch devices, require a short press + small move
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    })
+  );
+
+  return (
+    <DndContext 
+      sensors={sensors}
+      collisionDetection={rectIntersection} 
+      onDragEnd={onDragEnd}
+      onDragStart={onDragStart}
     >
-      {children}
-    </div>
-  </DndContext>
-);
+      <div
+        className={cn('grid w-full auto-cols-fr grid-flow-col gap-4', className)}
+      >
+        {children}
+      </div>
+      <DragOverlay>
+        {dragOverlay}
+      </DragOverlay>
+    </DndContext>
+  );
+};
