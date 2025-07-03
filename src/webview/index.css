@@ -17,6 +17,12 @@
     --color-primary-foreground: var(--vscode-button-foreground);
     --color-secondary: var(--vscode-button-secondaryBackground);
     --color-secondary-foreground: var(--vscode-button-secondaryForeground);
+    --color-widget-background: var(--vscode-editorWidget-background);
+    --color-widget-border: var(--vscode-editorWidget-border);
+    --color-code-snippet-background: var(--vscode-textPreformat-background);
+    --color-code-snippet-text: var(--vscode-textPreformat-foreground);
+    --font-editor-font: var(--vscode-editor-font-family);
+    --font-editor-size: var(--vscode-editor-font-size);
     --color-input-background: var(--vscode-input-background);
     --color-input-foreground: var(--vscode-input-foreground);
     --color-accent: var(--vscode-focusBorder);
@@ -138,6 +144,8 @@
     outline: 2px solid var(--vscode-focusBorder);
     outline-offset: 2px;
   }
+  
+
 }
 
 /* Line clamp utility for text truncation */

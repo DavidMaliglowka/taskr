@@ -26,23 +26,140 @@ interface TaskDetailsViewProps {
   onNavigateToTask: (taskId: string) => void;
 }
 
-// Custom Priority Badge Component (matching Kanban board styling)
-const PriorityBadge: React.FC<{ priority: TaskMasterTask['priority'] }> = ({ priority }) => {
-  const colorMap = {
-    high: 'bg-red-500/20 text-red-400 border-red-500/30',
-    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    low: 'bg-green-500/20 text-green-400 border-green-500/30',
+// Markdown renderer component to handle code blocks
+const MarkdownRenderer: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
+  // Parse content to separate code blocks from regular text
+  const parseMarkdown = (text: string) => {
+    const parts = [];
+    const lines = text.split('\n');
+    let currentBlock = [];
+    let inCodeBlock = false;
+    let codeLanguage = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line.startsWith('```')) {
+        if (inCodeBlock) {
+          // End of code block
+          if (currentBlock.length > 0) {
+            parts.push({
+              type: 'code',
+              content: currentBlock.join('\n'),
+              language: codeLanguage
+            });
+            currentBlock = [];
+          }
+          inCodeBlock = false;
+          codeLanguage = '';
+        } else {
+          // Start of code block
+          if (currentBlock.length > 0) {
+            parts.push({
+              type: 'text',
+              content: currentBlock.join('\n')
+            });
+            currentBlock = [];
+          }
+          inCodeBlock = true;
+          codeLanguage = line.substring(3).trim(); // Get language after ```
+        }
+      } else {
+        currentBlock.push(line);
+      }
+    }
+
+    // Handle remaining content
+    if (currentBlock.length > 0) {
+      parts.push({
+        type: inCodeBlock ? 'code' : 'text',
+        content: currentBlock.join('\n'),
+        language: codeLanguage
+      });
+    }
+
+    return parts;
   };
+
+  const parts = parseMarkdown(content);
+
+  return (
+    <div className={className}>
+      {parts.map((part, index) => {
+                 if (part.type === 'code') {
+           return (
+             <pre
+               key={index}
+               className="bg-code-snippet-background text-code-snippet-text font-[family-name:var(--font-editor-font)] text-[length:var(--font-editor-size)] p-3 rounded-md border border-widget-border my-2 overflow-x-auto"
+             >
+               {part.content}
+             </pre>
+           );
+         } else {
+          // Handle inline code (single backticks) in text blocks
+          const textWithInlineCode = part.content.split(/(`[^`]+`)/g).map((segment, segIndex) => {
+            if (segment.startsWith('`') && segment.endsWith('`')) {
+              const codeContent = segment.slice(1, -1);
+              return (
+                <code
+                  key={segIndex}
+                  className="bg-code-snippet-background text-code-snippet-text font-[family-name:var(--font-editor-font)] text-[length:var(--font-editor-size)] px-1 py-0.5 rounded border border-widget-border"
+                >
+                  {codeContent}
+                </code>
+              );
+            }
+            return segment;
+          });
+
+          return (
+            <div key={index} className="whitespace-pre-wrap text-sm text-vscode-foreground/80 my-1">
+              {textWithInlineCode}
+            </div>
+          );
+        }
+      })}
+    </div>
+  );
+};
+
+// Custom Priority Badge Component with theme-adaptive styling
+const PriorityBadge: React.FC<{ priority: TaskMasterTask['priority'] }> = ({ priority }) => {
+  const getPriorityColors = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return {
+          backgroundColor: 'rgba(239, 68, 68, 0.2)', // red-500 with opacity
+          color: '#dc2626', // red-600 - works in both themes
+          borderColor: 'rgba(239, 68, 68, 0.4)'
+        };
+      case 'medium':
+        return {
+          backgroundColor: 'rgba(245, 158, 11, 0.2)', // amber-500 with opacity
+          color: '#d97706', // amber-600 - works in both themes
+          borderColor: 'rgba(245, 158, 11, 0.4)'
+        };
+      case 'low':
+        return {
+          backgroundColor: 'rgba(34, 197, 94, 0.2)', // green-500 with opacity
+          color: '#16a34a', // green-600 - works in both themes
+          borderColor: 'rgba(34, 197, 94, 0.4)'
+        };
+      default:
+        return {
+          backgroundColor: 'rgba(156, 163, 175, 0.2)',
+          color: 'var(--vscode-foreground)',
+          borderColor: 'rgba(156, 163, 175, 0.4)'
+        };
+    }
+  };
+
+  const colors = getPriorityColors(priority);
 
   return (
     <span 
-      className={`
-        inline-flex items-center justify-center
-        px-2 py-0.5
-        rounded text-xs font-medium border 
-        min-w-[50px]
-        ${colorMap[priority]}
-      `}
+      className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-medium border min-w-[50px]"
+      style={colors}
       title={priority}
     >
       {priority}
@@ -50,25 +167,56 @@ const PriorityBadge: React.FC<{ priority: TaskMasterTask['priority'] }> = ({ pri
   );
 };
 
-// Custom Status Badge Component with dropdown styling
+// Custom Status Badge Component with theme-adaptive styling
 const StatusBadge: React.FC<{ status: TaskMasterTask['status'] }> = ({ status }) => {
-  const colorMap = {
-    pending: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-    'in-progress': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    review: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    done: 'bg-green-500/20 text-green-400 border-green-500/30',
-    deferred: 'bg-red-500/20 text-red-400 border-red-500/30',
+  const getStatusColors = (status: string) => {
+    // Use colors that work well in both light and dark themes
+    switch (status) {
+      case 'pending':
+        return {
+          backgroundColor: 'rgba(156, 163, 175, 0.2)', // gray-400 with opacity
+          color: 'var(--vscode-foreground)',
+          borderColor: 'rgba(156, 163, 175, 0.4)'
+        };
+      case 'in-progress':
+        return {
+          backgroundColor: 'rgba(245, 158, 11, 0.2)', // amber-500 with opacity
+          color: '#d97706', // amber-600 - works in both themes
+          borderColor: 'rgba(245, 158, 11, 0.4)'
+        };
+      case 'review':
+        return {
+          backgroundColor: 'rgba(59, 130, 246, 0.2)', // blue-500 with opacity
+          color: '#2563eb', // blue-600 - works in both themes
+          borderColor: 'rgba(59, 130, 246, 0.4)'
+        };
+      case 'done':
+        return {
+          backgroundColor: 'rgba(34, 197, 94, 0.2)', // green-500 with opacity
+          color: '#16a34a', // green-600 - works in both themes
+          borderColor: 'rgba(34, 197, 94, 0.4)'
+        };
+      case 'deferred':
+        return {
+          backgroundColor: 'rgba(239, 68, 68, 0.2)', // red-500 with opacity
+          color: '#dc2626', // red-600 - works in both themes
+          borderColor: 'rgba(239, 68, 68, 0.4)'
+        };
+      default:
+        return {
+          backgroundColor: 'rgba(156, 163, 175, 0.2)',
+          color: 'var(--vscode-foreground)',
+          borderColor: 'rgba(156, 163, 175, 0.4)'
+        };
+    }
   };
+
+  const colors = getStatusColors(status);
 
   return (
     <span 
-      className={`
-        inline-flex items-center justify-center
-        px-2 py-0.5
-        rounded text-xs font-medium border 
-        min-w-[60px]
-        ${colorMap[status]}
-      `}
+      className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-medium border min-w-[60px]"
+      style={colors}
       title={status}
     >
       {status === 'pending' ? 'todo' : status}
@@ -513,7 +661,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="p-0 h-auto text-purple-400 hover:text-purple-300"
+                className="p-0 h-auto text-vscode-foreground/80 hover:text-vscode-foreground"
                 onClick={() => setIsAiActionsExpanded(!isAiActionsExpanded)}
               >
                 {isAiActionsExpanded ? (
@@ -527,7 +675,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
             </div>
 
             {isAiActionsExpanded && (
-              <div className="bg-purple-950/20 rounded-lg p-4 border border-purple-800/30">
+              <div className="bg-widget-background rounded-lg p-4 border border-widget-border">
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="ai-prompt" className="block text-sm font-medium text-vscode-foreground/80 mb-2">
@@ -538,7 +686,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                       placeholder="Describe what you want to change or add to this task..."
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      className="min-h-[100px] bg-vscode-input-background border-vscode-input-border text-vscode-input-foreground placeholder-vscode-input-foreground/50 focus:border-purple-500 focus:ring-purple-500"
+                      className="min-h-[100px] bg-vscode-input-background border-vscode-input-border text-vscode-input-foreground placeholder-vscode-input-foreground/50 focus:border-vscode-focusBorder focus:ring-vscode-focusBorder"
                       disabled={isRegenerating || isAppending}
                     />
                   </div>
@@ -547,7 +695,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                     <Button
                       onClick={handleRegenerate}
                       disabled={!prompt.trim() || isRegenerating || isAppending}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {isRegenerating ? (
                         <>
@@ -566,7 +714,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                       onClick={handleAppend}
                       disabled={!prompt.trim() || isRegenerating || isAppending}
                       variant="outline"
-                      className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white bg-transparent"
+                      className="bg-secondary text-secondary-foreground hover:bg-secondary/90 border-widget-border"
                     >
                       {isAppending ? (
                         <>
@@ -617,25 +765,25 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
             </div>
 
             {isImplementationExpanded && (
-              <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
-                {isLoadingTaskFileData ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-vscode-foreground/50" />
-                    <span className="ml-2 text-sm text-vscode-foreground/70">Loading details...</span>
-                  </div>
-                ) : taskFileDataError ? (
-                  <div className="text-sm text-red-400 py-2">
-                    Error loading details: {taskFileDataError}
-                  </div>
-                ) : taskFileData.details ? (
-                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
-                    {taskFileData.details}
-                  </pre>
-                ) : (
-                  <div className="text-sm text-vscode-foreground/50 py-2">
-                    No implementation details available
-                  </div>
-                )}
+              <div className="bg-widget-background rounded-lg p-4 border border-widget-border">
+                <div className="implementation-content">
+                  {isLoadingTaskFileData ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-vscode-foreground/50" />
+                      <span className="ml-2 text-sm text-vscode-foreground/70">Loading details...</span>
+                    </div>
+                  ) : taskFileDataError ? (
+                    <div className="text-sm text-red-400 py-2">
+                      Error loading details: {taskFileDataError}
+                    </div>
+                  ) : taskFileData.details ? (
+                    <MarkdownRenderer content={taskFileData.details} />
+                  ) : (
+                    <div className="text-sm text-vscode-foreground/50 py-2">
+                      No implementation details available
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -662,25 +810,25 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
             </div>
 
             {isTestStrategyExpanded && (
-              <div className="bg-vscode-input-background/30 rounded-lg p-4 border border-vscode-border">
-                {isLoadingTaskFileData ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-vscode-foreground/50" />
-                    <span className="ml-2 text-sm text-vscode-foreground/70">Loading strategy...</span>
-                  </div>
-                ) : taskFileDataError ? (
-                  <div className="text-sm text-red-400 py-2">
-                    Error loading strategy: {taskFileDataError}
-                  </div>
-                ) : taskFileData.testStrategy ? (
-                  <pre className="whitespace-pre-wrap text-sm text-vscode-foreground/80 font-mono">
-                    {taskFileData.testStrategy}
-                  </pre>
-                ) : (
-                  <div className="text-sm text-vscode-foreground/50 py-2">
-                    No test strategy available
-                  </div>
-                )}
+              <div className="bg-widget-background rounded-lg p-4 border border-widget-border">
+                <div className="test-strategy-content">
+                  {isLoadingTaskFileData ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-vscode-foreground/50" />
+                      <span className="ml-2 text-sm text-vscode-foreground/70">Loading strategy...</span>
+                    </div>
+                  ) : taskFileDataError ? (
+                    <div className="text-sm text-red-400 py-2">
+                      Error loading strategy: {taskFileDataError}
+                    </div>
+                  ) : taskFileData.testStrategy ? (
+                    <MarkdownRenderer content={taskFileData.testStrategy} />
+                  ) : (
+                    <div className="text-sm text-vscode-foreground/50 py-2">
+                      No test strategy available
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -714,19 +862,55 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                 <div className="space-y-3">
                   {currentTask.subtasks.map((subtask, index) => {
                     const subtaskId = `${currentTask.id}.${index + 1}`;
-                    const statusColorMap = {
-                      pending: 'bg-gray-600',
-                      'in-progress': 'bg-yellow-500',
-                      review: 'bg-blue-500',
-                      done: 'bg-green-500',
-                      deferred: 'bg-red-500',
+                    const getStatusDotColor = (status: string) => {
+                      switch (status) {
+                        case 'pending': return '#9ca3af'; // gray-400
+                        case 'in-progress': return '#f59e0b'; // amber-500
+                        case 'review': return '#3b82f6'; // blue-500
+                        case 'done': return '#22c55e'; // green-500
+                        case 'deferred': return '#ef4444'; // red-500
+                        default: return '#9ca3af';
+                      }
                     };
-                    const statusBadgeMap = {
-                      pending: 'bg-gray-800 text-gray-400',
-                      'in-progress': 'bg-yellow-900/30 text-yellow-400 border-yellow-800',
-                      review: 'bg-blue-900/30 text-blue-400 border-blue-800',
-                      done: 'bg-green-900/30 text-green-400 border-green-800',
-                      deferred: 'bg-red-900/30 text-red-400 border-red-800',
+                    const getSubtaskStatusColors = (status: string) => {
+                      switch (status) {
+                        case 'pending':
+                          return {
+                            backgroundColor: 'rgba(156, 163, 175, 0.2)',
+                            color: 'var(--vscode-foreground)',
+                            borderColor: 'rgba(156, 163, 175, 0.4)'
+                          };
+                        case 'in-progress':
+                          return {
+                            backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                            color: '#d97706',
+                            borderColor: 'rgba(245, 158, 11, 0.4)'
+                          };
+                        case 'review':
+                          return {
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            color: '#2563eb',
+                            borderColor: 'rgba(59, 130, 246, 0.4)'
+                          };
+                        case 'done':
+                          return {
+                            backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                            color: '#16a34a',
+                            borderColor: 'rgba(34, 197, 94, 0.4)'
+                          };
+                        case 'deferred':
+                          return {
+                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                            color: '#dc2626',
+                            borderColor: 'rgba(239, 68, 68, 0.4)'
+                          };
+                        default:
+                          return {
+                            backgroundColor: 'rgba(156, 163, 175, 0.2)',
+                            color: 'var(--vscode-foreground)',
+                            borderColor: 'rgba(156, 163, 175, 0.4)'
+                          };
+                      }
                     };
 
                     return (
@@ -735,11 +919,18 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                         className="flex items-center gap-3 p-3 rounded-md border border-textSeparator-foreground hover:border-vscode-border/70 transition-colors cursor-pointer"
                         onClick={() => onNavigateToTask(subtaskId)}
                       >
-                        <div className={`w-4 h-4 rounded-full ${statusColorMap[subtask.status]} flex items-center justify-center`}>
+                        <div 
+                          className="w-4 h-4 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: getStatusDotColor(subtask.status) }}
+                        >
                           <div className="w-2 h-2 bg-white rounded-full" />
                         </div>
                         <span className="flex-1 text-vscode-foreground">{subtask.title}</span>
-                        <Badge variant="secondary" className={`${statusBadgeMap[subtask.status]} border`}>
+                        <Badge 
+                          variant="secondary" 
+                          className="border"
+                          style={getSubtaskStatusColors(subtask.status)}
+                        >
                           {subtask.status === 'pending' ? 'todo' : subtask.status}
                         </Badge>
                       </div>
@@ -766,19 +957,27 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                   <select
                     value={currentTask.status}
                     onChange={(e) => handleStatusChange(e.target.value as TaskMasterTask['status'])}
-                    className={`border rounded-md px-3 py-1 text-sm font-medium focus:ring-1 bg-vscode-input-background border-vscode-input-border text-vscode-input-foreground focus:border-vscode-focusBorder focus:ring-vscode-focusBorder ${
-                      currentTask.status === 'pending'
-                        ? 'text-gray-400'
-                        : currentTask.status === 'in-progress'
-                          ? 'text-yellow-400'
-                          : currentTask.status === 'review'
-                            ? 'text-blue-400'
-                            : currentTask.status === 'done'
-                              ? 'text-green-400'
-                              : currentTask.status === 'deferred'
-                                ? 'text-red-400'
-                                : 'text-vscode-foreground'
-                    }`}
+                    className="border rounded-md px-3 py-1 text-sm font-medium focus:ring-1 focus:border-vscode-focusBorder focus:ring-vscode-focusBorder"
+                    style={{
+                      backgroundColor: currentTask.status === 'pending' ? 'rgba(156, 163, 175, 0.2)' :
+                                      currentTask.status === 'in-progress' ? 'rgba(245, 158, 11, 0.2)' :
+                                      currentTask.status === 'review' ? 'rgba(59, 130, 246, 0.2)' :
+                                      currentTask.status === 'done' ? 'rgba(34, 197, 94, 0.2)' :
+                                      currentTask.status === 'deferred' ? 'rgba(239, 68, 68, 0.2)' :
+                                      'var(--vscode-input-background)',
+                      color: currentTask.status === 'pending' ? 'var(--vscode-foreground)' :
+                             currentTask.status === 'in-progress' ? '#d97706' :
+                             currentTask.status === 'review' ? '#2563eb' :
+                             currentTask.status === 'done' ? '#16a34a' :
+                             currentTask.status === 'deferred' ? '#dc2626' :
+                             'var(--vscode-foreground)',
+                      borderColor: currentTask.status === 'pending' ? 'rgba(156, 163, 175, 0.4)' :
+                                   currentTask.status === 'in-progress' ? 'rgba(245, 158, 11, 0.4)' :
+                                   currentTask.status === 'review' ? 'rgba(59, 130, 246, 0.4)' :
+                                   currentTask.status === 'done' ? 'rgba(34, 197, 94, 0.4)' :
+                                   currentTask.status === 'deferred' ? 'rgba(239, 68, 68, 0.4)' :
+                                   'var(--vscode-input-border)'
+                    }}
                   >
                     <option value="pending">To do</option>
                     <option value="in-progress">In Progress</option>
