@@ -662,7 +662,7 @@ const TaskCard: React.FC<{
         w-full
         min-h-[120px]
         border border-vscode-border/50
-        bg-vscode-input/80 hover:bg-vscode-input
+        bg-card
         flex-shrink-0
       "
     >

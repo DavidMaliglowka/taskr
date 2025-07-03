@@ -1,34 +1,34 @@
 @import "tailwindcss";
 
 /* shadcn/ui CSS variables */
-@layer base {
-  :root {
+@theme {
     /* VS Code CSS variables will be injected here */
-    color-scheme: var(--vscode-theme-kind, light);
+    /* color-scheme: var(--vscode-theme-kind, light); */
     
     /* shadcn/ui variables - adapted for VS Code */
-    --background: var(--vscode-editor-background);
-    --foreground: var(--vscode-foreground);
-    --card: var(--vscode-editor-background);
-    --card-foreground: var(--vscode-foreground);
-    --popover: var(--vscode-editor-background);
-    --popover-foreground: var(--vscode-foreground);
-    --primary: var(--vscode-button-background);
-    --primary-foreground: var(--vscode-button-foreground);
-    --secondary: var(--vscode-button-secondaryBackground);
-    --secondary-foreground: var(--vscode-button-secondaryForeground);
-    --muted: var(--vscode-input-background);
-    --muted-foreground: var(--vscode-input-foreground);
-    --accent: var(--vscode-focusBorder);
-    --accent-foreground: var(--vscode-foreground);
-    --destructive: var(--vscode-errorForeground);
-    --destructive-foreground: var(--vscode-foreground);
-    --border: var(--vscode-panel-border);
-    --input: var(--vscode-input-background);
-    --ring: var(--vscode-focusBorder);
+    --color-background: var(--vscode-editor-background);
+    --color-sidebar-background: var(--vscode-sideBar-background);
+    --color-foreground: var(--vscode-foreground);
+    --color-card: var(--vscode-editor-background);
+    --color-card-foreground: var(--vscode-foreground);
+    --color-popover: var(--vscode-editor-background);
+    --color-popover-foreground: var(--vscode-foreground);
+    --color-primary: var(--vscode-button-background);
+    --color-primary-foreground: var(--vscode-button-foreground);
+    --color-secondary: var(--vscode-button-secondaryBackground);
+    --color-secondary-foreground: var(--vscode-button-secondaryForeground);
+    --color-muted: var(--vscode-input-background);
+    --color-muted-foreground: var(--vscode-input-foreground);
+    --color-accent: var(--vscode-focusBorder);
+    --color-accent-foreground: var(--vscode-foreground);
+    --color-destructive: var(--vscode-errorForeground);
+    --color-destructive-foreground: var(--vscode-foreground);
+    --color-border: var(--vscode-panel-border);
+    --color-input: var(--vscode-input-background);
+    --color-ring: var(--vscode-focusBorder);
     --radius: 0.5rem;
   }
-}
+
 
 /* Reset body to match VS Code styles instead of Tailwind defaults */
 @layer base {
