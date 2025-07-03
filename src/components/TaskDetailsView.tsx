@@ -13,6 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface TaskDetailsViewProps {
   taskId: string;
@@ -135,6 +140,11 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   const handleSaveDescription = async () => {
     if (!currentTask || isSaving) return;
 
+    // Check if task is completed - TaskMaster prevents editing completed tasks
+    if (currentTask.status === 'done') {
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (isSubtask && parentTask) {
@@ -163,7 +173,7 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
         });
       }
     } catch (error) {
-      console.error('Failed to save description:', error);
+      console.error('❌ TaskDetailsView: Failed to save description:', error);
     } finally {
       setIsSaving(false);
     }
@@ -172,6 +182,18 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
   // Handle dependency navigation
   const handleDependencyClick = (depId: string) => {
     onNavigateToTask(depId);
+  };
+
+  // Check if editing should be disabled
+  const isEditingDisabled = currentTask?.status === 'done' || isSaving;
+  const getEditingDisabledReason = () => {
+    if (currentTask?.status === 'done') {
+      return 'Completed tasks cannot be edited to preserve work integrity';
+    }
+    if (isSaving) {
+      return 'Saving changes...';
+    }
+    return '';
   };
 
   if (!currentTask) {
@@ -239,12 +261,102 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
               onChange={(e) => setEditedDescription(e.target.value)}
               onBlur={handleSaveDescription}
               className="min-h-[120px] resize-y"
-              disabled={isSaving}
+              disabled={isEditingDisabled}
             />
             {isSaving && (
               <p className="text-xs text-vscode-foreground/50">Saving...</p>
             )}
+            {/* Show disabled reason for completed tasks */}
+            {currentTask?.status === 'done' && (
+              <p className="text-xs text-vscode-foreground/60 italic">
+                💡 {getEditingDisabledReason()}
+              </p>
+            )}
           </div>
+
+          {/* Subtasks section */}
+          {currentTask.subtasks && currentTask.subtasks.length > 0 && (
+            <div className="space-y-3">
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-between h-auto p-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Subtasks</span>
+                      <Badge variant="secondary">
+                        {currentTask.subtasks.filter(st => st.status === 'done').length} / {currentTask.subtasks.length}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Click to toggle</span>
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3">
+                  <div className="space-y-3">
+                    {currentTask.subtasks.map((subtask, index) => {
+                      const subtaskId = `${currentTask.id}.${index + 1}`;
+                      return (
+                        <Card 
+                          key={subtask.id} 
+                          className="cursor-pointer hover:bg-vscode-input/20 transition-colors"
+                          onClick={() => onNavigateToTask(subtaskId)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              {/* Subtask header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-medium text-sm flex-1">
+                                  {subtask.title}
+                                </h4>
+                                <StatusBadge status={subtask.status} />
+                              </div>
+                              
+                              {/* Subtask description */}
+                              {subtask.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {subtask.description}
+                                </p>
+                              )}
+                              
+                              {/* Subtask dependencies */}
+                              {subtask.dependencies && subtask.dependencies.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Depends on:</span>
+                                  <div className="flex gap-1 flex-wrap">
+                                    {subtask.dependencies.map((depId) => {
+                                      const depTask = tasks.find(t => t.id === depId);
+                                      const isCompleted = depTask?.status === 'done';
+                                      return (
+                                        <Button
+                                          key={depId}
+                                          variant="link"
+                                          size="sm"
+                                          className="h-auto p-0 text-xs"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDependencyClick(depId);
+                                          }}
+                                        >
+                                          <span className={isCompleted ? 'text-green-400' : 'text-muted-foreground'}>
+                                            {isCompleted ? '✅' : '⏱️'} Task {depId}
+                                          </span>
+                                        </Button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
 
           {/* Details section */}
           {currentTask.details && (
@@ -331,19 +443,6 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                         );
                       })}
                     </div>
-                  </div>
-                </>
-              )}
-
-              {/* Subtasks count */}
-              {currentTask.subtasks && currentTask.subtasks.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Subtasks</span>
-                    <Badge variant="secondary">
-                      {currentTask.subtasks.filter(st => st.status === 'done').length} / {currentTask.subtasks.length}
-                    </Badge>
                   </div>
                 </>
               )}

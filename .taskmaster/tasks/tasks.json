@@ -554,65 +554,65 @@
         "id": 12,
         "title": "Finalize VS Code integration and packaging",
         "description": "Complete the VS Code-specific integration tasks and prepare the extension for packaging and distribution.",
-        "details": "1. Implement activation events in package.json\n2. Create commands for showing/hiding the Kanban board\n3. Add an extension icon and update manifest details\n4. Write user documentation and add it to the extension's README\n5. Implement telemetry (respecting user privacy)\n6. Set up CI/CD for automated testing and packaging\n7. Prepare for VS Code Marketplace submission",
-        "testStrategy": "Perform end-to-end testing of the extension in a clean VS Code environment. Verify all commands work as expected. Review documentation for completeness. Test the packaged extension (VSIX file) to ensure all assets are correctly included.",
-        "priority": "medium",
+        "status": "pending",
         "dependencies": [
           11
         ],
-        "status": "pending",
+        "priority": "medium",
+        "details": "1. Implement activation events in package.json\n2. Create commands for showing/hiding the Kanban board\n3. Add an extension icon and update manifest details\n4. Write user documentation and add it to the extension's README\n5. Implement telemetry (respecting user privacy)\n6. Set up CI/CD for automated testing and packaging\n7. Prepare for VS Code Marketplace submission",
+        "testStrategy": "Perform end-to-end testing of the extension in a clean VS Code environment. Verify all commands work as expected. Review documentation for completeness. Test the packaged extension (VSIX file) to ensure all assets are correctly included.",
         "subtasks": [
           {
             "id": 1,
             "title": "Set up VS Code extension project structure",
             "description": "Initialize the VS Code extension project and set up the basic file structure",
+            "status": "pending",
             "dependencies": [],
             "details": "1. Install Node.js and npm\n2. Run 'npm install -g yo generator-code'\n3. Execute 'yo code' to scaffold the extension\n4. Choose TypeScript as the language\n5. Fill in extension details (name, description, etc.)\n6. Open the project in VS Code",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Implement core extension functionality",
             "description": "Develop the main features of the VS Code extension",
+            "status": "pending",
             "dependencies": [
               1
             ],
             "details": "1. Define extension commands in package.json\n2. Implement command handlers in extension.ts\n3. Create UI components (e.g., webviews) if needed\n4. Add error handling for API calls and user interactions\n5. Implement data persistence (if required)\n6. Write unit tests for core functions",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Package and test the extension locally",
             "description": "Prepare the extension for distribution and test it in a local environment",
+            "status": "pending",
             "dependencies": [
               2
             ],
             "details": "1. Update package.json with correct metadata\n2. Run 'npm run lint' to check for code style issues\n3. Execute 'npm run test' to run all unit tests\n4. Use 'vsce package' to create a .vsix file\n5. Install the .vsix file locally using 'code --install-extension your-extension.vsix'\n6. Test the extension thoroughly in a new VS Code window",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Prepare marketplace submission",
             "description": "Create necessary assets and documentation for VS Code marketplace submission",
+            "status": "pending",
             "dependencies": [
               3
             ],
             "details": "1. Design an icon for the extension (at least 128x128px)\n2. Write a comprehensive README.md with usage instructions\n3. Create a CHANGELOG.md file\n4. Add license information\n5. Capture screenshots or GIFs demonstrating the extension\n6. Prepare a short demo video (optional but recommended)",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Submit to VS Code marketplace and manage versions",
             "description": "Publish the extension to the marketplace and set up a version management process",
+            "status": "pending",
             "dependencies": [
               4
             ],
             "details": "1. Create a publisher account on the VS Code marketplace\n2. Use 'vsce login' to authenticate\n3. Run 'vsce publish' to publish the extension\n4. Set up a GitHub repository for version control\n5. Implement a versioning strategy (e.g., semantic versioning)\n6. Create a process for updating the extension (code changes, version bump, changelog update, and republish)",
-            "status": "pending",
             "testStrategy": ""
           }
         ]
