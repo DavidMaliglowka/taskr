@@ -91,18 +91,36 @@ export async function readTaskFileData(taskId: string, tagName: string = 'master
  * @returns The task object if found, undefined otherwise
  */
 export function findTaskById(tasks: TaskWithDetails[], taskId: string): TaskWithDetails | undefined {
+  // Check if this is a subtask ID with dotted notation (e.g., "1.2")
+  if (taskId.includes('.')) {
+    const [parentId, subtaskId] = taskId.split('.');
+    console.log('🔍 Looking for subtask:', { parentId, subtaskId, taskId });
+    
+    // Find the parent task first
+    const parentTask = tasks.find(task => String(task.id) === parentId);
+    if (!parentTask || !parentTask.subtasks) {
+      console.log('❌ Parent task not found or has no subtasks:', parentId);
+      return undefined;
+    }
+    
+    console.log('📋 Parent task found with', parentTask.subtasks.length, 'subtasks');
+    console.log('🔍 Subtask IDs in parent:', parentTask.subtasks.map(st => st.id));
+    
+    // Find the subtask within the parent
+    const subtask = parentTask.subtasks.find(st => String(st.id) === subtaskId);
+    if (subtask) {
+      console.log('✅ Subtask found:', subtask.id);
+    } else {
+      console.log('❌ Subtask not found:', subtaskId);
+    }
+    return subtask;
+  }
+  
+  // For regular task IDs (not dotted notation)
   for (const task of tasks) {
     // Convert both to strings for comparison to handle string vs number IDs
     if (String(task.id) === String(taskId)) {
       return task;
-    }
-    
-    // Check subtasks if they exist
-    if (task.subtasks) {
-      const subtask = findTaskById(task.subtasks, taskId);
-      if (subtask) {
-        return subtask;
-      }
     }
   }
   

@@ -699,6 +699,46 @@ export function activate(context: vscode.ExtensionContext) {
 							});
 						}
 						break;
+
+					case 'updateSubtask':
+						console.log('📝 Updating subtask content:', message.data);
+						try {
+							if (taskMasterApi && message.data?.taskId && message.data?.prompt) {
+								const updateResult = await taskMasterApi.updateSubtask(
+									message.data.taskId,
+									message.data.prompt,
+									{
+										projectRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+										research: message.data.options?.research || false
+									}
+								);
+								
+								if (updateResult.success) {
+									panel.webview.postMessage({
+										type: 'subtaskUpdated',
+										requestId: message.requestId,
+										success: true,
+										data: { 
+											taskId: message.data.taskId, 
+											prompt: message.data.prompt 
+										}
+									});
+									console.log(`✅ Updated subtask ${message.data.taskId} content`);
+								} else {
+									throw new Error(updateResult.error || 'Failed to update subtask');
+								}
+							} else {
+								throw new Error('Invalid subtask update data or Task Master API not initialized');
+							}
+						} catch (error) {
+							console.error('❌ Error updating subtask:', error);
+							panel.webview.postMessage({
+								type: 'error',
+								requestId: message.requestId,
+								error: error instanceof Error ? error.message : 'Failed to update subtask'
+							});
+						}
+						break;
 						
 					case 'startPolling':
 						console.log('🔄 Manual start polling requested');

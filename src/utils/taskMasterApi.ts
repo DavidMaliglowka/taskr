@@ -339,6 +339,51 @@ export class TaskMasterApi {
   }
 
   /**
+   * Update subtask content using the update_subtask MCP tool
+   */
+  async updateSubtask(taskId: string, prompt: string, options?: {
+    projectRoot?: string;
+    research?: boolean;
+  }): Promise<TaskMasterApiResponse<boolean>> {
+    const startTime = Date.now();
+
+    try {
+      const mcpArgs: Record<string, unknown> = {
+        id: taskId,
+        prompt: prompt,
+        projectRoot: options?.projectRoot || this.getWorkspaceRoot()
+      };
+
+      // Add optional parameters
+      if (options?.research !== undefined) {
+        mcpArgs.research = options.research;
+      }
+
+      console.log('TaskMasterApi: Calling update_subtask with args:', mcpArgs);
+
+      await this.callMCPTool('update_subtask', mcpArgs);
+      
+      // Clear relevant caches
+      this.clearCachePattern('get_tasks');
+
+      return {
+        success: true,
+        data: true,
+        requestDuration: Date.now() - startTime
+      };
+
+    } catch (error) {
+      console.error('TaskMasterApi: Error updating subtask:', error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        requestDuration: Date.now() - startTime
+      };
+    }
+  }
+
+  /**
    * Get current Task Master connection status
    */
   getConnectionStatus(): { isConnected: boolean; error?: string } {

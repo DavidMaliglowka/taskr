@@ -386,13 +386,19 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
     setTaskFileDataError(null);
     
     try {
-      console.log('📄 Fetching task file data for task:', currentTask.id);
+      // For subtasks, construct the full dotted ID (e.g., "1.2")
+      // For main tasks, use the task ID as-is
+      const fileTaskId = isSubtask && parentTask 
+        ? `${parentTask.id}.${currentTask.id}`
+        : currentTask.id;
+      
+      console.log('📄 Fetching task file data for task:', fileTaskId);
       
       // Get implementation details and test strategy from file
       const fileData = await sendMessage({
         type: 'readTaskFileData',
         data: {
-          taskId: currentTask.id,
+          taskId: fileTaskId,
           tag: 'master' // TODO: Make this configurable
         }
       });
@@ -683,7 +689,10 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                     </Label>
                     <Textarea
                       id="ai-prompt"
-                      placeholder="Describe what you want to change or add to this task..."
+                      placeholder={isSubtask 
+                        ? "Describe implementation notes, progress updates, or findings to add to this subtask..."
+                        : "Describe what you want to change or add to this task..."
+                      }
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       className="min-h-[100px] bg-vscode-input-background border-vscode-input-border text-vscode-input-foreground placeholder-vscode-input-foreground/50 focus:border-vscode-focusBorder focus:ring-vscode-focusBorder"
@@ -692,51 +701,65 @@ export const TaskDetailsView: React.FC<TaskDetailsViewProps> = ({
                   </div>
 
                   <div className="flex gap-3">
-                    <Button
-                      onClick={handleRegenerate}
-                      disabled={!prompt.trim() || isRegenerating || isAppending}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      {isRegenerating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Regenerating...
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 className="w-4 h-4 mr-2" />
-                          Regenerate Task
-                        </>
-                      )}
-                    </Button>
+                    {/* Show regenerate button only for main tasks, not subtasks */}
+                    {!isSubtask && (
+                      <Button
+                        onClick={handleRegenerate}
+                        disabled={!prompt.trim() || isRegenerating || isAppending}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        {isRegenerating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Regenerating...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-4 h-4 mr-2" />
+                            Regenerate Task
+                          </>
+                        )}
+                      </Button>
+                    )}
 
                     <Button
                       onClick={handleAppend}
                       disabled={!prompt.trim() || isRegenerating || isAppending}
-                      variant="outline"
-                      className="bg-secondary text-secondary-foreground hover:bg-secondary/90 border-widget-border"
+                      variant={isSubtask ? "default" : "outline"}
+                      className={isSubtask 
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/90 border-widget-border"
+                      }
                     >
                       {isAppending ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Appending...
+                          {isSubtask ? "Updating..." : "Appending..."}
                         </>
                       ) : (
                         <>
                           <PlusCircle className="w-4 h-4 mr-2" />
-                          Append to Task
+                          {isSubtask ? "Add Notes to Subtask" : "Append to Task"}
                         </>
                       )}
                     </Button>
                   </div>
 
                   <div className="text-xs text-vscode-foreground/60 space-y-1">
-                    <p>
-                      <strong>Regenerate:</strong> Completely rewrites the task description and subtasks based on your prompt
-                    </p>
-                    <p>
-                      <strong>Append:</strong> Adds new content to the existing task description based on your prompt
-                    </p>
+                    {isSubtask ? (
+                      <p>
+                        <strong>Add Notes:</strong> Appends timestamped implementation notes, progress updates, or findings to this subtask's details
+                      </p>
+                    ) : (
+                      <>
+                        <p>
+                          <strong>Regenerate:</strong> Completely rewrites the task description and subtasks based on your prompt
+                        </p>
+                        <p>
+                          <strong>Append:</strong> Adds new content to the existing task description based on your prompt
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
