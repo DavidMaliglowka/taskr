@@ -1,300 +1,189 @@
-# Task Master Kanban for VS Code
+# Taskr - Task Master Kanban
 
-A visual Kanban board extension for VS Code that integrates with [Task Master AI](https://github.com/TaskMasterEYJ/task-master-ai) projects, providing an intuitive drag-and-drop interface for task management.
+Transform your [Task Master AI](https://github.com/TaskMasterEYJ/task-master-ai) projects into a beautiful, interactive Kanban board directly in VS Code. Drag, drop, and manage your tasks with ease while maintaining real-time synchronization with your Task Master project files.
 
-![Task Master Kanban](https://img.shields.io/badge/VS%20Code-Extension-blue)
-![React](https://img.shields.io/badge/React-19-61dafb)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4.1-38bdf8)
+![Taskr - Task Master Kanban](https://img.shields.io/badge/VS%20Code-Extension-blue)
+![Free](https://img.shields.io/badge/Price-Free-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue)
 
-## Features
+## ✨ Features
 
-- **Visual Kanban Board**: Drag-and-drop task management with columns for different statuses (To Do, In Progress, Review, Done, Deferred)
-- **Task Master Integration**: Seamlessly connects to Task Master AI projects via MCP (Model Context Protocol)
-- **Real-time Updates**: Automatic polling for task changes with smart frequency adjustment
-- **Detailed Task View**: View and edit task details, implementation notes, and test strategies
-- **AI-Powered Features**: Regenerate and append task content using AI capabilities
-- **Offline Support**: Graceful handling of network interruptions with cached data
-- **Modern UI**: Built with ShadCN UI components and Tailwind CSS for a native VS Code experience
-- **Performance Optimized**: Smart caching, lazy loading, and background refresh capabilities
+### 🎯 **Visual Task Management**
+- **Drag & Drop Kanban Board** - Intuitive task management with visual columns
+- **Real-time Synchronization** - Changes sync instantly with your Task Master project files
+- **Status Columns** - To Do, In Progress, Review, Done, and Deferred
+- **Task Details View** - View and edit implementation details, test strategies, and notes
 
-## Prerequisites
+![Kanban Board](assets/screenshots/kanban-board.png)
 
-Before running this project, ensure you have:
+### 🤖 **AI-Powered Features**
+- **Task Content Generation** - Regenerate task descriptions using AI
+- **Smart Task Updates** - Append findings and progress notes automatically
+- **MCP Integration** - Seamless connection to Task Master AI via Model Context Protocol
+- **Intelligent Caching** - Smart performance optimization with background refresh
 
-- **Node.js** (version 18 or higher)
-- **pnpm** (recommended) or npm
-- **VS Code** (version 1.74.0 or higher)
-- **Task Master AI** package (`task-master-ai`) available globally or via npx
+![Task Details](assets/screenshots/task-details.png)
 
-### Task Master AI Setup
+### 🚀 **Performance & Usability**
+- **Offline Support** - Continue working even when disconnected
+- **Auto-refresh** - Automatic polling for task changes with smart frequency
+- **VS Code Native** - Perfectly integrated with VS Code themes and UI
+- **Modern Interface** - Built with ShadCN UI components and Tailwind CSS
 
-This extension requires Task Master AI to function. Install it globally:
+## 🛠️ Installation
 
+### Prerequisites
+
+1. **VS Code** 1.90.0 or higher
+2. **Node.js** 18.0 or higher (for Task Master MCP server)
+
+### Install the Extension
+
+1. **From VS Code Marketplace:**
+   - Click the **Install** button above
+   - The extension will be automatically added to your VS Code instance
+
+## 🚀 Quick Start
+
+### 1. **Initialize Task Master Project**
+If you don't have a Task Master project yet:
 ```bash
-npm install -g task-master-ai
-```
-
-Or ensure it's available via npx (it will be installed automatically when needed).
-
-## Installation
-
-### For Development
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd taskr
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pnpm install
-   # or
-   npm install
-   ```
-
-3. **Build the extension:**
-   ```bash
-   pnpm run compile
-   # or
-   npm run compile
-   ```
-
-### For VS Code Extension Development
-
-1. **Open in VS Code:**
-   ```bash
-   code .
-   ```
-
-2. **Install recommended extensions** when prompted (ESLint, TypeScript, etc.)
-
-3. **Run the extension:**
-   - Press `F5` to open a new VS Code window with the extension loaded
-   - Or use the "Run Extension" debug configuration
-
-## Usage
-
-### Opening the Kanban Board
-
-1. **Initialize a Task Master project** in your workspace (if not already done):
-   ```bash
+cd your-project
    npx task-master-ai init
    ```
 
-2. **Open the Command Palette** (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+### 2. **Open Kanban Board**
+- **Command Palette** (Ctrl+Shift+P): `Task Master Kanban: Show Board`
+- **Or** the extension automatically activates when you have a `.taskmaster` folder in your workspace
 
-3. **Run the command:**
-   ```
-   Task Master Kanban: Show Board
-   ```
+### 3. **MCP Server Setup**
+The extension automatically handles the Task Master MCP server connection:
+- **No manual installation required** - The extension spawns the MCP server automatically
+- **Uses npx by default** - Automatically downloads Task Master AI when needed
+- **Configurable** - You can customize the MCP server command in settings if needed
 
-4. The Kanban board will open in a new webview panel
+### 4. **Start Managing Tasks**
+- **Drag tasks** between columns to change status
+- **Click tasks** to view detailed information
+- **Use AI features** to enhance task content
+- **Add subtasks** with the + button on parent tasks
 
-### Managing Tasks
+## 📋 Usage Guide
 
-- **Drag and Drop**: Move tasks between columns to change their status
-- **View Details**: Click on a task to see detailed information
-- **Edit Tasks**: Double-click a task to edit its content
-- **AI Features**: Use the AI panel in task details to regenerate or append content
+### **Managing Tasks**
 
-### Configuration
+| Action | How To |
+|--------|--------|
+| **Change Task Status** | Drag task to different column |
+| **View Details** | Click on any task |
+| **Edit Task** | Click task, then use edit controls |
+| **Add Subtask** | Click + button on parent task |
+| **Use AI Features** | Open task details and use AI panel |
 
-The extension can be configured via VS Code settings. Access them through:
-- Command Palette → "Preferences: Open Settings (UI)"
-- Search for "Task Master Kanban"
+### **Kanban Columns**
 
-Key settings include:
-- **MCP Server Command**: Path to task-master-ai executable
-- **Connection Timeout**: How long to wait for MCP server responses
-- **Auto Refresh**: Enable/disable automatic task polling
-- **Theme Preferences**: UI theme and display options
+- **📝 To Do** - Tasks ready to be worked on
+- **⚡ In Progress** - Currently active tasks  
+- **👀 Review** - Tasks pending review or approval
+- **✅ Done** - Completed tasks
+- **⏸️ Deferred** - Postponed or blocked tasks
 
-## Development
+### **AI-Powered Task Management**
 
-### Project Structure
+The extension integrates seamlessly with Task Master AI via MCP to provide:
+- **Smart Task Generation** - AI creates detailed implementation plans
+- **Progress Tracking** - Append timestamped notes and findings
+- **Content Enhancement** - Regenerate task descriptions for clarity
+- **Research Integration** - Get up-to-date information for your tasks
 
-```
-taskr/
-├── src/
-│   ├── extension.ts              # VS Code extension entry point
-│   ├── webview/
-│   │   └── index.tsx            # React Kanban board UI
-│   ├── components/
-│   │   ├── TaskDetailsView.tsx   # Task detail view component
-│   │   └── ui/                  # ShadCN UI components
-│   └── utils/
-│       ├── mcpClient.ts         # MCP client manager
-│       ├── taskMasterApi.ts     # Task Master API wrapper
-│       └── taskFileReader.ts    # Task file utilities
-├── dist/                        # Built extension files
-├── esbuild.js                   # Build configuration
-└── package.json
-```
+## ⚙️ Configuration
 
-### Available Scripts
+Access settings via **File → Preferences → Settings** and search for "Task Master":
 
-```bash
-# Development
-pnpm run watch                   # Watch mode for development
-pnpm run compile                 # Build extension and webview
-pnpm run check-types            # TypeScript type checking
-pnpm run lint                   # ESLint code linting
+### **MCP Connection Settings**
+- **MCP Server Command** - Path to task-master-ai executable (default: `npx`)
+- **MCP Server Args** - Arguments for the server command (default: `-y`, `--package=task-master-ai`, `task-master-ai`)
+- **Connection Timeout** - Server response timeout (default: 30s)
+- **Auto Refresh** - Enable automatic task updates (default: enabled)
 
-# Testing
-pnpm run test                   # Run extension tests
-pnpm run pretest               # Prepare for testing
+### **UI Preferences**
+- **Theme** - Auto, Light, or Dark mode
+- **Show Completed Tasks** - Display done tasks in board (default: enabled)
+- **Task Display Limit** - Maximum tasks to show (default: 100)
 
-# Production
-pnpm run package               # Build for production
-pnpm run vscode:prepublish     # Prepare for publishing
-```
+### **Performance Options**
+- **Cache Duration** - How long to cache task data (default: 5s)
+- **Concurrent Requests** - Max simultaneous API calls (default: 5)
 
-### Watch Mode Development
+## 🔧 Troubleshooting
 
-For active development, use watch mode:
+### **Extension Not Loading**
+1. Ensure Node.js 18+ is installed
+2. Check workspace contains `.taskmaster` folder
+3. Restart VS Code
+4. Check Output panel (View → Output → Task Master Kanban)
 
-```bash
-pnpm run watch
-```
+### **MCP Connection Issues**
+1. **Command not found**: Ensure Node.js and npx are in your PATH
+2. **Timeout errors**: Increase timeout in settings
+3. **Permission errors**: Check Node.js permissions
+4. **Network issues**: Verify internet connection for npx downloads
 
-This will:
-- Watch for TypeScript changes in the extension
-- Watch for React changes in the webview
-- Automatically rebuild on file changes
+### **Tasks Not Updating**
+1. Check MCP connection status in status bar
+2. Verify `.taskmaster/tasks/tasks.json` exists
+3. Try manual refresh: `Task Master Kanban: Check Connection`
+4. Review error logs in Output panel
 
-Then press `F5` in VS Code to launch the extension development host.
+### **Performance Issues**
+1. Reduce task display limit in settings
+2. Increase cache duration
+3. Disable auto-refresh if needed
+4. Close other VS Code extensions temporarily
 
-### Adding New UI Components
+## 🆘 Support & Resources
 
-This project uses [ShadCN UI](https://ui.shadcn.com/) components. To add new components:
+### **Getting Help**
+- 📖 **Documentation**: [Task Master AI Docs](https://github.com/TaskMasterEYJ/task-master-ai)
+- 🐛 **Report Issues**: [GitHub Issues](https://github.com/TaskMasterEYJ/taskr/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/TaskMasterEYJ/taskr/discussions)
 
-```bash
-# Example: Adding a new button variant
-npx shadcn@latest add button
-```
+### **Related Projects**
+- 🤖 **Task Master AI**: [Core task management system](https://github.com/TaskMasterEYJ/task-master-ai)
+- 📡 **MCP Protocol**: [Model Context Protocol](https://modelcontextprotocol.io/)
 
-Components are automatically configured to work with the VS Code theme system.
+## 🎯 Tips for Best Results
 
-## Architecture
+### **Project Organization**
+- Use descriptive task titles
+- Add detailed implementation notes
+- Set appropriate task dependencies
+- Leverage AI features for complex tasks
 
-### MCP Integration
+### **Workflow Optimization**
+- Review task details before starting work
+- Use subtasks for complex features
+- Update task status as you progress
+- Add findings and learnings to task notes
 
-The extension communicates with Task Master AI via the Model Context Protocol (MCP):
-
-1. **Extension Host** (Node.js): Manages the MCP client connection
-2. **Webview** (React): Displays the UI and sends commands via message passing
-3. **MCP Server** (`task-master-ai`): Handles task operations and AI features
-
-### State Management
-
-- **Extension State**: Managed in `src/extension.ts` with connection handling and polling
-- **Webview State**: React state with useReducer for complex state updates
-- **Caching**: Intelligent caching system with background refresh and LRU eviction
-
-### Error Handling
-
-Comprehensive error handling with:
-- Connection retry logic with exponential backoff
-- Offline mode with cached data
-- Toast notifications for user feedback
-- Detailed error logging for debugging
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Task Master not found" error:**
-   - Ensure `task-master-ai` is installed: `npm install -g task-master-ai`
-   - Check that Node.js is in your PATH
-   - Restart VS Code after installing Node.js
-
-2. **Connection timeout:**
-   - Increase timeout in settings: `taskmaster.mcp.timeout`
-   - Check if Task Master project is properly initialized
-   - Verify workspace contains a `.taskmaster` directory
-
-3. **Webview not loading:**
-   - Check VS Code developer console for errors (`Help → Toggle Developer Tools`)
-   - Try reloading the window (`Ctrl+R` / `Cmd+R`)
-   - Rebuild the extension: `pnpm run compile`
-
-4. **Tasks not updating:**
-   - Verify MCP connection status in the status bar
-   - Check network connectivity
-   - Try manual refresh with "Task Master Kanban: Check Connection"
-
-### Debug Mode
-
-Enable debug logging by setting:
-```json
-{
-  "taskmaster.debug.enableLogging": true,
-  "taskmaster.debug.logLevel": "debug"
-}
-```
-
-Logs will appear in:
-- VS Code Output panel (Task Master channel)
-- Browser developer console (for webview issues)
-
-## Contributing
-
-### Development Setup
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and test thoroughly
-4. Ensure all tests pass: `pnpm test`
-5. Lint your code: `pnpm run lint`
-6. Commit your changes: `git commit -m 'Add amazing feature'`
-7. Push to the branch: `git push origin feature/amazing-feature`
-8. Open a Pull Request
-
-### Code Style
-
-This project follows:
-- **TypeScript**: Strict mode enabled
-- **ESLint**: Configured for TypeScript and React
-- **Prettier**: Integrated with ESLint
-- **Conventional Commits**: For clear commit messages
-
-### Testing
-
-Run tests before submitting:
-```bash
-pnpm run test
-```
-
-For manual testing:
-1. Load the extension in development mode (`F5`)
-2. Test with various Task Master project configurations
-3. Verify functionality in both light and dark VS Code themes
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Related Projects
-
-- [Task Master AI](https://github.com/TaskMasterEYJ/task-master-ai) - The core task management system
-- [ShadCN UI](https://ui.shadcn.com/) - UI component library
-- [Model Context Protocol](https://modelcontextprotocol.io/) - Communication protocol for AI tools
-
-## Support
-
-If you encounter issues or have questions:
-
-1. Check the [troubleshooting section](#troubleshooting) above
-2. Search existing [GitHub issues](../../issues)
-3. Create a new issue with:
-   - VS Code version
-   - Extension version
-   - Task Master AI version
-   - Steps to reproduce
-   - Error logs (if any)
+### **Collaboration**
+- Keep task descriptions updated
+- Use consistent status conventions
+- Document decisions in task details
+- Share knowledge through task notes
 
 ---
 
-**Enjoy using Task Master Kanban!** 🎯
+## 🏆 Why Taskr - Task Master Kanban?
+
+✅ **Visual workflow management** for your Task Master projects  
+✅ **AI-powered task enhancement** built right in  
+✅ **Real-time synchronization** keeps everything in sync  
+✅ **Native VS Code integration** feels like part of the editor  
+✅ **Free and open source** with active development  
+
+**Transform your development workflow today!** 🚀
+
+---
+
+*Made with ❤️ by [David Maliglowka](https://www.davidmaliglowka.com)*
