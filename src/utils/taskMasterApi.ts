@@ -384,6 +384,61 @@ export class TaskMasterApi {
   }
 
   /**
+   * Add a new subtask to an existing task using the add_subtask MCP tool
+   */
+  async addSubtask(parentTaskId: string, subtaskData: {
+    title: string;
+    description?: string;
+    dependencies?: string[];
+    status?: string;
+  }, options?: {
+    projectRoot?: string;
+  }): Promise<TaskMasterApiResponse<boolean>> {
+    const startTime = Date.now();
+
+    try {
+      const mcpArgs: Record<string, unknown> = {
+        id: parentTaskId,
+        title: subtaskData.title,
+        projectRoot: options?.projectRoot || this.getWorkspaceRoot()
+      };
+
+      // Add optional parameters
+      if (subtaskData.description) {
+        mcpArgs.description = subtaskData.description;
+      }
+      if (subtaskData.dependencies && subtaskData.dependencies.length > 0) {
+        mcpArgs.dependencies = subtaskData.dependencies.join(',');
+      }
+      if (subtaskData.status) {
+        mcpArgs.status = subtaskData.status;
+      }
+
+      console.log('TaskMasterApi: Calling add_subtask with args:', mcpArgs);
+
+      await this.callMCPTool('add_subtask', mcpArgs);
+      
+      // Clear relevant caches to force refresh
+      this.clearCachePattern('get_tasks');
+
+      return {
+        success: true,
+        data: true,
+        requestDuration: Date.now() - startTime
+      };
+
+    } catch (error) {
+      console.error('TaskMasterApi: Error adding subtask:', error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        requestDuration: Date.now() - startTime
+      };
+    }
+  }
+
+  /**
    * Get current Task Master connection status
    */
   getConnectionStatus(): { isConnected: boolean; error?: string } {
