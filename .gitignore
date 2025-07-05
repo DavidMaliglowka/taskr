@@ -1,8 +1,13 @@
+# Build outputs
+temp-package/
+out/
 out
+*.vsix
 dist
 node_modules
 .vscode-test/
-*.vsix
+.vsix-build/
+.packaging/
 
 # Logs
 logs
@@ -11,6 +16,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 dev-debug.log
+
+# Debug files
+debug-*.mjs
+package.mjs
 
 # Dependency directories
 node_modules/
@@ -31,6 +40,7 @@ node_modules/
 
 # OS specific
 .DS_Store
+Thumbs.db
 
 # AI Agent Configurations (personal/local settings)
 .cursor/

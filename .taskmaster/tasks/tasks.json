@@ -554,7 +554,7 @@
         "id": 12,
         "title": "Finalize VS Code integration and packaging",
         "description": "Complete the VS Code-specific integration tasks and prepare the extension for packaging and distribution.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           11
         ],
@@ -880,7 +880,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T20:55:39.412Z",
-      "updated": "2025-07-03T21:58:59.376Z",
+      "updated": "2025-07-05T07:26:04.745Z",
       "description": "Tasks for master context"
     }
   }

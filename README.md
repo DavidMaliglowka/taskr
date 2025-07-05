@@ -186,4 +186,15 @@ Access settings via **File → Preferences → Settings** and search for "Task M
 
 ---
 
-*Made with ❤️ by [David Maliglowka](https://www.davidmaliglowka.com)*
+*Made with ❤️ by [David Maliglowka](https://x.com/DavidMaliglowka)*
+
+## Support
+
+This is an open-source project maintained in my spare time. While I strive to fix bugs and improve the extension, support is provided on a best-effort basis. Feel free to:
+- Report issues on [GitHub](https://github.com/DavidMaliglowka/taskr)
+- Submit pull requests with improvements
+- Fork the project if you need specific modifications
+
+## Disclaimer
+
+This extension is provided "as is" without any warranties. Use at your own risk. The author is not responsible for any issues, data loss, or damages that may occur from using this extension. Please backup your work regularly and test thoroughly before using in important projects.

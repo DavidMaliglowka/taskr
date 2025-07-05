@@ -1,6 +1,5 @@
 const esbuild = require("esbuild");
 const path = require("path");
-const postcss = require("esbuild-postcss");
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -74,6 +73,11 @@ async function main() {
 		outdir: 'dist',
 		external: ['vscode'],
 		logLevel: 'silent',
+		// Add production optimizations
+		...(production && {
+			drop: ['debugger'],
+			pure: ['console.log', 'console.debug', 'console.trace'],
+		}),
 		plugins: [
 			esbuildProblemMatcherPlugin,
 			aliasPlugin,
@@ -95,14 +99,19 @@ async function main() {
 		target: ['es2020'],
 		jsx: 'automatic',
 		jsxImportSource: 'react',
+		external: ['*.css'],
 		define: {
 			'process.env.NODE_ENV': production ? '"production"' : '"development"',
 			'global': 'globalThis'
 		},
+		// Add production optimizations for webview too
+		...(production && {
+			drop: ['debugger'],
+			pure: ['console.log', 'console.debug', 'console.trace'],
+		}),
 		plugins: [
 			esbuildProblemMatcherPlugin,
 			aliasPlugin,
-			postcss()
 		],
 	});
 

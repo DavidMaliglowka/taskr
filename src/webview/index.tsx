@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useReducer, useContext, createContext, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import './index.css';
 
 // Import shadcn Kanban components
 import { 

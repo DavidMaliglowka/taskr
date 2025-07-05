@@ -1,14 +1,76 @@
-.vscode/**
-.vscode-test/**
-out/**
-node_modules/**
-src/**
-.gitignore
-.yarnrc
-esbuild.js
-vsc-extension-quickstart.md
-**/tsconfig.json
-**/eslint.config.mjs
+# Environment and secrets
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/test/**
+.vscode-test.mjs
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development files
+debug-*.mjs
+package.mjs
+package.publish.json
+test/
 **/*.map
 **/*.ts
-**/.vscode-test.*
+**/*.tsx
+esbuild.js
+postcss.config.js
+tailwind.config.js
+tsconfig.json
+pnpm-lock.yaml
+vsc-extension-quickstart.md
+components.json
+debug-mcp-website.js
+eslint.config.mjs
+package.minimal.json
+package.sh
+
+# Build outputs
+*.vsix
+out/
+node_modules/
+src/
+src/**
+.vsix-build/
+.packaging/
+
+# Git and IDE
+.git/**
+.gitignore
+.vscode/
+.vscode-test/
+.github/
+.taskmaster/
+
+# Documentation (except what we want to include)
+CLAUDE.md
+DEVELOPMENT.md
+
+# Node modules and package managers
+node_modules/**
+.pnpm-store/**
+pnpm-lock.yaml
+.npmrc
+
+
+
+*.md
+
+
+## Allow
+!README.md
+!CHANGELOG.md
+!AGENTS.md
+
+
+
+
